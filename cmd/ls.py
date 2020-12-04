@@ -1,14 +1,14 @@
 from collections import namedtuple
-from models.utils import list_child_items
+from cmd.db_helpers import list_child_items
 from flask import session
-from blueprints import PARENT_ID
+from const import PARENT_ID
 
 LS_CMD = "ls_cmd"
 LS_RE = r'^ls( -l)*( \d+)*$'  # LS -l [LEVEL]
 LsArgs = namedtuple("LsArgs", ["is_verbose", "level"])
 
 
-def validate_ls_cmd_args(match):
+def validate_ls_cmd_args(match, db):
     is_verbose = True if match.group(1) else False
     level = int(match.group(2)) if match.group(2) else 1
 
@@ -62,12 +62,13 @@ def dir_tree_structure(dir_contents, is_verbose=False):
     return lines
 
 
-def execute_ls_cmd(ls_args):
+def execute_ls_cmd(ls_args, db):
+    print(db, type(db))
     # in  hierarchical order
     print(session)
     print("execute_ls_cmd", session.get(PARENT_ID, None))
     folder_contents = list_child_items(
-        session.get(PARENT_ID, 0), ls_args.level)
+        parent_id=session.get(PARENT_ID, 0), depth=ls_args.level, db=db)
     print("folder_contents", folder_contents)
     resp = {
         "response": dir_tree_structure(folder_contents, ls_args.is_verbose)

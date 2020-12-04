@@ -1,7 +1,6 @@
 import os
-from models import db
 from flask import session
-from blueprints import PARENT_ID, PARENT_ABS_PATH
+from const import PARENT_ID, PARENT_ABS_PATH
 
 
 def clean_re_group(s):

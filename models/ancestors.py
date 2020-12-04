@@ -1,6 +1,7 @@
 
 from sqlalchemy.sql.sqltypes import INTEGER, STRINGTYPE, TEXT
-from models import db, with_row_locks
+from models import Base
+from models import with_row_locks
 from models.item import Item
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy import (
@@ -14,7 +15,7 @@ from sqlalchemy.sql.functions import concat
 from sqlalchemy.sql.expression import cast, literal
 
 
-class Ancestors(db.Model):
+class Ancestors(Base):
     __tablename__ = "ancestors"
 
     parent_id = Column(Integer, ForeignKey('item.id'), primary_key=True)
@@ -31,7 +32,7 @@ class Ancestors(db.Model):
         self.rank = rank
 
     @staticmethod
-    def add_item(child_id, parent_id=None):
+    def add_item(child_id, db, parent_id=None):
         """
         docstring
         """
@@ -55,7 +56,7 @@ class Ancestors(db.Model):
         db.session.add(new_root)
 
     @staticmethod
-    def delete_item(id):
+    def delete_item(id, db):
         print("Deleting from ancestor table id={}".format(id))
         select_parent_rows = with_row_locks(db.session.query(
             Ancestors), of=Ancestors).filter(Ancestors.child_id == id)

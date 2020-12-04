@@ -106,8 +106,8 @@
   ],
   "python.languageServer": "Pylance",
   "python.analysis.extraPaths": [
-    "/Users/thuypham/virtual_file_system/venv/lib",
-    "/Users/thuypham/virtual_file_system",
-    "/Users/thuypham/virtual_file_system/blueprints"
+    "/Users/thuypham/Desktop/virtual-file-system/venv/lib",
+    "/Users/thuypham/Desktop/virtual-file-system",
+    "/Users/thuypham/Desktop/virtual-file-system/blueprints"
   ]
 }

@@ -4,6 +4,10 @@ import json
 from flask import current_app  # TODO: learn about this
 
 
+def terminal_prefix(cur_dir):
+    return f'{cur_dir} > '
+
+
 def format_response(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):

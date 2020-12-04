@@ -29,7 +29,7 @@
 
         $.ajax({
           type: 'POST',
-          url: "{{ url_for('terminal.execute_cmd') }}",
+          url: "{{ url_for('execute_cmd') }}",
           data: JSON.stringify({ "user_input": value.replace(cur_dir, '') }),
           contentType: 'application/json',
           success: function (data, _textStatus, _request) {

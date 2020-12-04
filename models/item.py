@@ -6,10 +6,11 @@ from sqlalchemy import (
     Boolean
 )
 from datetime import datetime
-from models import db, with_row_locks
+from models import Base
+from models import with_row_locks
 
 
-class Item(db.Model):
+class Item(Base):
     __tablename__ = "item"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -26,7 +27,7 @@ class Item(db.Model):
         self. updated_at = updated_at
 
     @staticmethod
-    def add_item(name, updated_at=datetime.now(), size=0, is_dir=False):
+    def add_item(name, db, updated_at=datetime.now(), size=0, is_dir=False):
         print("Adding to item table name={} updated_at={} size={} is_dir={}".format(
             name, updated_at, size, is_dir))
         new_item = Item(name, updated_at, size, is_dir)
@@ -36,13 +37,13 @@ class Item(db.Model):
 
         return new_item.id
 
-    def update_item_size(self, size):
+    def update_item_size(self, size, db):
         self.size = size
 
         db.session.add(self)
 
     @staticmethod
-    def delete_item(id):
+    def delete_item(id, db):
         print("Deleting from item table id={}".format(id))
         item = with_row_locks(db.session.query(Item), of=Item).filter(
             Item.id == id)
