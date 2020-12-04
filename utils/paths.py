@@ -18,7 +18,7 @@ def to_abs_path(path):
     abs_path = clean_re_group(path)
 
     if not os.path.isabs(path):
-        cur_dir = session[PARENT_ABS_PATH]
+        cur_dir = session.get(PARENT_ABS_PATH, "/")
         abs_path = os.path.join(cur_dir, path)
 
     # resolve aliases . and .. and /(at the end) if present

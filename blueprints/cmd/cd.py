@@ -26,6 +26,7 @@ def execute_cd_cmd(cd_args):
     print(f'Executing cd cmd')
     session[PARENT_ABS_PATH] = cd_args.folder
     session[PARENT_ID] = cd_args.folder_id
+    session.modified = True
 
     print("CD parent_id -> {}".format(cd_args.folder_id))
     print(cd_args.folder_id)

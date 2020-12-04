@@ -57,6 +57,9 @@ def cmd_type(user_input):
 @format_response
 def execute_cmd():
     try:
+        print("in execute")
+        print(session)
+        print(session[PARENT_ABS_PATH], session[PARENT_ID])
         user_input = request.json.get(USER_INPUT)
 
         print(f'Received console input={user_input}')
@@ -78,11 +81,12 @@ def execute_cmd():
         raise e
 
 
-@ terminal.route("/")
+@terminal.route("/")
 def terminal_ui():
-    if not session.get(PARENT_ABS_PATH, None):
+    if not session.get(PARENT_ABS_PATH, None) or session[PARENT_ABS_PATH] == "/":
         session[PARENT_ABS_PATH] = "/"
         session[PARENT_ID] = BASE_DIR_ID
+        session.modified = True
 
     print(session[PARENT_ABS_PATH], session[PARENT_ID])
     return render_template("base.html", cur_dir=terminal_prefix(session[PARENT_ABS_PATH]))

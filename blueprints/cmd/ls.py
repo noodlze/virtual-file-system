@@ -36,7 +36,7 @@ def dir_tree_structure(dir_contents, is_verbose=False):
 
     # add a row for each item in the folder
 
-    for i, (ancestor, item, _) in enumerate(dir_contents):
+    for i, (ancestor, item) in enumerate(dir_contents):
         print(ancestor.rank)
         level = ancestor.rank.count(',')
 
@@ -64,10 +64,10 @@ def dir_tree_structure(dir_contents, is_verbose=False):
 
 def execute_ls_cmd(ls_args):
     # in  hierarchical order
-
-    print("execute_ls_cmd", session[PARENT_ID])
+    print(session)
+    print("execute_ls_cmd", session.get(PARENT_ID, None))
     folder_contents = list_child_items(
-        session[PARENT_ID], ls_args.level)
+        session.get(PARENT_ID, 0), ls_args.level)
     print("folder_contents", folder_contents)
     resp = {
         "response": dir_tree_structure(folder_contents, ls_args.is_verbose)
