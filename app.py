@@ -2,7 +2,7 @@ from cmd import CMD_TYPE_MAP, CMD_PARSER, CMD_EXECUTOR
 from const import BASE_DIR_ID, PARENT_ID, PARENT_ABS_PATH
 from utils.response import format_response
 from flask import request, session, render_template
-from flask_session import Session
+from flask_session.__init__ import Session
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask
 from utils.response import terminal_prefix
