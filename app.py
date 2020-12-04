@@ -11,11 +11,11 @@ def create_app():
     # flask app configs
     flask_app.config.from_object('config.Config')
 
-    # init db
-    migrate = Migrate()
+    # # init db
+    # migrate = Migrate()
 
-    db.init_app(flask_app)
-    migrate.init_app(flask_app, db, "migrations")
+    # db.init_app(flask_app)
+    # migrate.init_app(flask_app, db, "migrations")
 
     # register blueprints
     flask_app.register_blueprint(terminal)
@@ -25,8 +25,8 @@ def create_app():
 
 app = create_app()
 
-with app.app_context():
-    upgrade(directory="migrations")  # run db upgrade
+# with app.app_context():
+#     upgrade(directory="migrations")  # run db upgrade
 
-# if __name__ == "__main__":
-#     app.run(debug=True)
+if __name__ == '__main__':
+    app.run()
