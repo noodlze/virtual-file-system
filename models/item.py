@@ -46,6 +46,6 @@ class Item(Base):
     def delete_item(id, db):
         print("Deleting from item table id={}".format(id))
         item = with_row_locks(db.session.query(Item), of=Item).filter(
-            Item.id == id)
+            Item.id == id).first()
 
         db.session.delete(item)

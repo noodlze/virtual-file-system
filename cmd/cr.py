@@ -39,14 +39,14 @@ def execute_cr_cmd(cr_args, db):
         cr_args.parent_id, cr_args.path, cr_args.data))
     all_parts = splitall(cr_args.path)
     item_name = all_parts[-1]
-
+    print("cr -p allparts={}".format(all_parts))
     # identify parent id of path to create
-    parent_id = None
+    parent_id = BASE_DIR_ID
     if cr_args.requires_create:
         # TODO: optimize
         parent_id = BASE_DIR_ID
         _path_itr = ""
-        for p in all_parts[-1]:  # create everything in parent directories
+        for p in all_parts[:-1]:  # create everything in parent directories
             print("Checking item {}".format(p))
             _path_itr += p
             exists, item_id = item_exists(abs_path=_path_itr, db=db)

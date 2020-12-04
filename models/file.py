@@ -28,7 +28,6 @@ class File(Base):
     @staticmethod
     def delete_item(id, db):
         print("Deleting from file table id={}".format(id))
-        item = with_row_locks(db.session.query(File), of=File).filter(
-            File.id == id)
 
-        db.session.delete(item)
+        with_row_locks(db.session.query(File), of=File).filter(
+            File.id == id).delete()

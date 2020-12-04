@@ -135,7 +135,7 @@ def add_new_item(name, item_parent_id, db, data=None):
             Item.id == item_parent_id).first()
 
         if parent_item:
-            parent_item.update_item_size(parent_item.size + 1, db)
+            parent_item.update_item_size(size=parent_item.size + 1, db=db)
             # Item(id=parent_item.id,
             #      name=parent_item.name,
             #      created_at=parent_item.created_at,
@@ -154,14 +154,21 @@ def add_new_item(name, item_parent_id, db, data=None):
 
 
 def delete_item(id, db):
-    # delete from item table
-    Item.delete_item(id=id, db=db)
+    # delete from ancestors table
+    # NOTE: must delete before item to avoid fk violation
+    # returns children items that need to be deleted
+    child_item_ids = Ancestors.delete_item(id=id, db=db)
 
     # delete from file table
-    File.delete_item(id=id, db=db)
+    # NOTE: must delete before item to avoid fk violation
+    with_row_locks(db.session.query(File), of=File).filter(
+        File.id.in_(child_item_ids+[id])).delete(synchronize_session=False)
 
-    # delete from ancestors table
-    Ancestors.delete_item(id=id, db=db)
+    # delete from item table
+    with_row_locks(db.session.query(Item), of=Item).filter(
+        Item.id.in_(child_item_ids+[id])).delete(synchronize_session=False)
+
+    db.session.commit()
 
 
 def move_item(id, new_parent_id, db):
