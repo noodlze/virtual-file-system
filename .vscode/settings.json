@@ -1,0 +1,113 @@
+{
+  // Explorer
+  "explorer.confirmDragAndDrop": false,
+
+  // Editor - Format
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
+
+  // Editor - Indentation
+  "editor.detectIndentation": true,
+  "editor.insertSpaces": true,
+  "editor.tabSize": 2,
+
+  // Git
+  "git.autofetch": true,
+  "git.confirmSync": false,
+
+  // Git Diff Editor
+  "diffEditor.ignoreTrimWhitespace": false,
+
+  // Terminal
+  "terminal.integrated.scrollback": 1000000000,
+  "terminal.integrated.rendererType": "auto",
+
+  // Extensions
+  "extensions.ignoreRecommendations": false,
+
+  // Files
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/build/**": true,
+    "**/node_modules/**": true
+  },
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+
+  // VSIcons
+  "workbench.iconTheme": "vscode-icons",
+  "vsicons.projectDetection.autoReload": true,
+  "vsicons.dontShowNewVersionMessage": true,
+
+  // GitLens
+  "gitlens.views.repositories.files.layout": "auto",
+  "gitlens.views.fileHistory.enabled": true,
+  "gitlens.views.lineHistory.enabled": true,
+  "gitlens.advanced.messages": {
+    "suppressCommitHasNoPreviousCommitWarning": false,
+    "suppressCommitNotFoundWarning": false,
+    "suppressFileNotUnderSourceControlWarning": false,
+    "suppressGitVersionWarning": false,
+    "suppressLineUncommittedWarning": false,
+    "suppressNoRepositoryWarning": false,
+    "suppressResultsExplorerNotice": false,
+    "suppressShowKeyBindingsNotice": true,
+    "suppressUpdateNotice": true,
+    "suppressWelcomeNotice": true
+  },
+
+  // Docker
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
+
+  // YAML
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // JSON
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // MarkdownLint
+  "markdownlint.config": {
+    // Allow punctuation marks (?!) in headers
+    "MD026": false
+  },
+
+  // Run on Save
+  "runOnSave.commands": [],
+
+  // Prettier
+
+  // Python
+  "python.autoComplete.extraPaths": [
+    "/Users/thuypham/virtual_file_system/venv/lib"
+  ], // set extra paths for which microsoft python langauge server will to look for imports
+  "python.venvPath": "/Users/thuypham/virtual_file_system/venv",
+  "python.pythonPath": "/Users/thuypham/virtual_file_system/venv/bin/python",
+  "python.linting.enabled": true,
+  "python.jediEnabled": false,
+  "python.linting.pycodestyleEnabled": false,
+  "python.linting.pylintEnabled": true,
+  "python.linting.pycodestyleArgs": [
+    "--ignore E121",
+    "--indent-size=2",
+    "--continuation-indent-size=2",
+    "--tab-size=2",
+    "--max-line-length=120"
+  ],
+  "python.languageServer": "Pylance",
+  "python.analysis.extraPaths": [
+    "/Users/thuypham/virtual_file_system/venv/lib",
+    "/Users/thuypham/virtual_file_system",
+    "/Users/thuypham/virtual_file_system/blueprints"
+  ]
+}

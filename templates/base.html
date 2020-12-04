@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initialscale=1.0">
+  <title>Document</title>
+  <link rel="stylesheet" type="text/css" href="static/styles.css">
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+</head>
+
+<body>
+  <input type="text" value="{{   cur_dir }} " id="txtInput">
+  <div id="cmdResponse">
+
+  </div>
+
+  <div id="errHighlight"></div>
+
+  <script>
+    var cur_dir = JSON.parse('{{   cur_dir | tojson }}'); // get
+
+    console.log("cur_dir", cur_dir);
+    $("#txtInput").on('keyup', function (event) {
+      if (event.keyCode === 13) {
+        var value = $('#txtInput').val();
+
+        $.ajax({
+          type: 'POST',
+          url: "{{ url_for('terminal.execute_cmd') }}",
+          data: JSON.stringify({ "user_input": value.replace(cur_dir, '') }),
+          contentType: 'application/json',
+          success: function (data, _textStatus, _request) {
+            // Received data from the server
+            // may be success/failure response
+            if (data.code == 0) {
+              var res = data.data;
+              console.log("cmd execution succeeded");
+              err_elem = document.getElementById("errHighlight");
+              err_elem.innerHTML = '';
+
+              resp_elem = document.getElementById("cmdResponse");// update response message
+              resp_elem.innerHTML = '';
+
+              if (typeof resp_elem !== 'undefined' && resp_elem !== null) {
+                var exec_resp = res.response;
+                if (exec_resp !== undefined) {
+                  // ls -l returns an array of folder item contents
+                  if (exec_resp.constructor === Array) {
+                    console.log("is an Array");
+                    for (var i = 0; i < exec_resp.length; i++) {
+                      const p = document.createElement('p');
+                      const pre = document.createElement('pre');
+                      const text = document.createTextNode(exec_resp[i]);
+                      pre.appendChild(text);
+                      p.appendChild(pre);
+                      resp_elem.appendChild(p);
+                    }
+                  } else {
+                    // text
+                    const pre = document.createElement('pre');
+                    const text = document.createTextNode(exec_resp);
+                    pre.appendChild(text);
+                    resp_elem.appendChild(pre);
+                  }
+                }
+                var new_dir = res.newDir;
+                if (new_dir !== undefined) {
+                  console.log("new dir is not undefined");
+                  $('#txtInput').val(new_dir);// update #txtInput value
+                  cur_dir = new_dir;
+                }
+
+              }
+
+            } else {
+              console.log("cmd execution returned error");
+              var res = data.data;
+              resp_elem = document.getElementById("cmdResponse");// update response message
+              resp_elem.innerHTML = '';
+
+              err_elem = document.getElementById("errHighlight");
+              if (typeof err_elem !== 'undefined' && err_elem !== null) {
+                err_elem.innerHTML = res.err;
+              }
+            }
+
+          },
+          error: function (xhr, _statusText, err) {
+            // Encountered error while calling api
+            console.log("encountered error");
+            alert(
+              "Error:" +
+              xhr.status +
+              " " +
+              err
+            );
+          },
+        });
+      }
+    });
+
+    $('#txtInput').on('input', function () {
+      // always show terminal prefix in txtInput
+      if (String($(this).val()).indexOf(cur_dir) == -1) {
+        $(this).val(cur_dir);
+      }
+    });
+  </script>
+
+</body>
+
+</html>
