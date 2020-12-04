@@ -52,7 +52,6 @@ def item_exists(abs_path, db):
     root_item = with_row_locks(db.session.query(Item), of=Item).filter(and_(not_(Item.id.in_(child_item_ids)),
                                                                             Item.name == allparts[0])).first()
     if not root_item:
-        print(f'Item {allparts[0]} in path {abs_path} does not exist')
         return False, BASE_DIR_ID
         raise ValueError(
             f'Item {allparts[0]} in path {abs_path} does not exist')
@@ -66,7 +65,6 @@ def item_exists(abs_path, db):
         item_id = with_row_locks(db.session.query(Item), of=Item).filter(and_(Item.id.in_(child_item_ids),
                                                                               Item.name == item_name)).first()
         if not item_id:
-            print(f'Item {item_name} in path {abs_path} does not exist')
             return False, BASE_DIR_ID
             raise ValueError(
                 f'Item {item_name} in path {abs_path} does not exist')
@@ -121,15 +119,16 @@ def add_new_item(name, item_parent_id, db, data=None):
         # add to item table
         is_dir = True if data == None else False
         size = len(data) if data else 0
-        new_item_id = Item.add_item(db,
+        new_item_id = Item.add_item(db=db,
                                     name=name, size=size, is_dir=is_dir)
 
         # add to file table
         if data:
-            File.add_item(db, file_id=new_item_id, data=data)
+            File.add_item(db=db, file_id=new_item_id, data=data)
 
         # add to ancestors table
-        Ancestors.add_item(db, child_id=new_item_id, parent_id=item_parent_id)
+        Ancestors.add_item(db=db, child_id=new_item_id,
+                           parent_id=item_parent_id)
 
         # update item_parent_id size
         parent_item = db.session.query(Item).filter(
@@ -156,13 +155,13 @@ def add_new_item(name, item_parent_id, db, data=None):
 
 def delete_item(id, db):
     # delete from item table
-    Item.delete_item(id, db)
+    Item.delete_item(id=id, db=db)
 
     # delete from file table
-    File.delete_item(id, db)
+    File.delete_item(id=id, db=db)
 
     # delete from ancestors table
-    Ancestors.delete_item(id, db)
+    Ancestors.delete_item(id=id, db=db)
 
 
 def move_item(id, new_parent_id, db):
@@ -170,7 +169,7 @@ def move_item(id, new_parent_id, db):
         Item), of=Item).filter(Item.id == id).first()
 
     # deleting all relationships of id from ancestors table
-    Ancestors.delete_item(id)
+    Ancestors.delete_item(id=id, db=db)
 
     # updating old parent size, updated_at(when item = directory)
     child_parent_rel = with_row_locks(db.session.query(

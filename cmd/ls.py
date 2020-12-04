@@ -65,8 +65,8 @@ def dir_tree_structure(dir_contents, is_verbose=False):
 def execute_ls_cmd(ls_args, db):
     print(db, type(db))
     # in  hierarchical order
-    print(session)
-    print("execute_ls_cmd", session.get(PARENT_ID, None))
+    print("execute_ls_cmd")
+    print("PARENT_ID =", session.get(PARENT_ID, None))
     folder_contents = list_child_items(
         parent_id=session.get(PARENT_ID, 0), depth=ls_args.level, db=db)
     print("folder_contents", folder_contents)

@@ -12,7 +12,7 @@
 </head>
 
 <body>
-  <input type="text" value="{{   cur_dir }} " id="txtInput">
+  <input type="text" value="{{ cur_dir }} " id="txtInput">
   <div id="cmdResponse">
 
   </div>
@@ -20,7 +20,7 @@
   <div id="errHighlight"></div>
 
   <script>
-    var cur_dir = JSON.parse('{{   cur_dir | tojson }}'); // get
+    var cur_dir = JSON.parse('{{  cur_dir | tojson }}'); // get
 
     console.log("cur_dir", cur_dir);
     $("#txtInput").on('keyup', function (event) {
@@ -30,7 +30,9 @@
         $.ajax({
           type: 'POST',
           url: "{{ url_for('execute_cmd') }}",
-          data: JSON.stringify({ "user_input": value.replace(cur_dir, '') }),
+          data: JSON.stringify({
+            "user_input": value.replace(cur_dir, '')
+          }),
           contentType: 'application/json',
           success: function (data, _textStatus, _request) {
             // Received data from the server
@@ -41,7 +43,7 @@
               err_elem = document.getElementById("errHighlight");
               err_elem.innerHTML = '';
 
-              resp_elem = document.getElementById("cmdResponse");// update response message
+              resp_elem = document.getElementById("cmdResponse"); // update response message
               resp_elem.innerHTML = '';
 
               if (typeof resp_elem !== 'undefined' && resp_elem !== null) {
@@ -69,7 +71,7 @@
                 var new_dir = res.newDir;
                 if (new_dir !== undefined) {
                   console.log("new dir is not undefined");
-                  $('#txtInput').val(new_dir);// update #txtInput value
+                  $('#txtInput').val(new_dir); // update #txtInput value
                   cur_dir = new_dir;
                 }
 
@@ -78,7 +80,7 @@
             } else {
               console.log("cmd execution returned error");
               var res = data.data;
-              resp_elem = document.getElementById("cmdResponse");// update response message
+              resp_elem = document.getElementById("cmdResponse"); // update response message
               resp_elem.innerHTML = '';
 
               err_elem = document.getElementById("errHighlight");

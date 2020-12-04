@@ -15,7 +15,7 @@ CdArgs = namedtuple("CdArgs", ['folder', 'folder_id'])
 def validate_cd_cmd_args(match, db):
     _folder = match.group(1)
     abs_path = to_abs_path(_folder)
-    exists, item_id = item_exists(abs_path, db)
+    exists, item_id = item_exists(abs_path=abs_path, db=db)
     print(f'validate cd cmd args {exists}')
     if not exists:
         raise ValueError(f'cd: no such file or directory: {_folder}')
@@ -30,7 +30,7 @@ def execute_cd_cmd(cd_args, db):
     session.modified = True
 
     print("CD parent_id -> {}".format(cd_args.folder_id))
-    print(cd_args.folder_id)
+    print("session[PARENT_ID]=", session[PARENT_ID])
     return {
         "newDir": terminal_prefix(session[PARENT_ABS_PATH]),
     }

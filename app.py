@@ -2,6 +2,7 @@ from cmd import CMD_TYPE_MAP, CMD_PARSER, CMD_EXECUTOR
 from const import BASE_DIR_ID, PARENT_ID, PARENT_ABS_PATH
 from utils.response import format_response
 from flask import request, session, render_template
+from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask
 from utils.response import terminal_prefix
@@ -12,6 +13,12 @@ USER_INPUT = "user_input"
 
 app = Flask(__name__)
 app.config.from_object('config.Config')  # flask app configs
+
+_session = Session(app)
+_session.app.session_interface.db.create_all()
+
+# with app.app_context():
+#     upgrade(directory="migrations")  # run db upgrade
 
 db = SQLAlchemy(app)
 
@@ -61,9 +68,6 @@ def terminal_ui():
     print(session[PARENT_ABS_PATH], session[PARENT_ID])
     return render_template("base.html", cur_dir=terminal_prefix(session[PARENT_ABS_PATH]))
 
-
-# with app.app_context():
-#     upgrade(directory="migrations")  # run db upgrade
 
 if __name__ == '__main__':
     app.run()

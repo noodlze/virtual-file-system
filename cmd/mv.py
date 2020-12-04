@@ -33,7 +33,7 @@ def validate_mv_cmd_args(match, db):
     abs_srcs = [to_abs_path(path) for path in srcs]
     srcs_ids = []
     for s in abs_srcs:
-        exists, item_id = item_exists(s, db)
+        exists, item_id = item_exists(abs_path=s, db=db)
 
         if not exists:
             raise ValueError(f'mv: no such file or directory: {s}')
@@ -44,35 +44,41 @@ def validate_mv_cmd_args(match, db):
 
 
 def execute_mv_cmd(mv_args, db):
+
     # TODO: deal with wildcards
     if len(mv_args.srcs) == 1:
         # check if parent folder exists
         parent_dest_exists, parent_dest_item_id = item_exists(
-            os.path.dirname(mv_args.abs_dest), db)
+            abs_path=os.path.dirname(mv_args.abs_dest), db=db)
 
         if not parent_dest_exists:
             return ValueError(f'mv: no such file or directory: {mv_args.abs_dest}')
 
         # check if destination item exists
-        dest_exists, dest_item_id = item_exists(mv_args.abs_dest, db)
+        dest_exists, dest_item_id = item_exists(
+            abs_path=mv_args.abs_dest, db=db)
         if dest_exists:
             dest_item_is_dir = with_row_locks(db.session.query(
                 Item.is_dir)).filter(Item.id == dest_item_id).first()
             if dest_item_is_dir:
                 # a directory
                 # move src item to new_parent_id
-                move_item(mv_args.srcs_id[0], dest_item_id, db)
+                move_item(id=mv_args.srcs_id[0],
+                          new_parent_id=dest_item_id, db=db)
             else:  # else dest_item = file
                 # delete destination file
-                delete_item(dest_item_id, db)
+                delete_item(id=dest_item_id, db=db)
                 # insert new file in the same parent directory as the deleted destination file
-                move_item(mv_args.src_id[0], parent_dest_item_id, db)
+                move_item(
+                    id=mv_args.src_id[0], new_parent_id=parent_dest_item_id, db=db)
         else:
             # TODO: still uncertain about whether I understood this requirement correctly
             # move the src to the parent_destination folder
-            move_item(mv_args.src_id[0], parent_dest_item_id, db)
+            move_item(id=mv_args.src_id[0],
+                      new_parent_id=parent_dest_item_id, db=db)
     else:  # many sources
-        dest_exists, dest_item_id = item_exists(mv_args.abs_dest, db)
+        dest_exists, dest_item_id = item_exists(
+            abs_path=mv_args.abs_dest, db=db)
 
         if not dest_exists:
             raise ValueError(
@@ -85,6 +91,6 @@ def execute_mv_cmd(mv_args, db):
                 f'mv: no such destination directory: {mv_args.abs_dest}')
 
         for src_id in mv_args.srcs_id:
-            move_item(src_id, dest_item_id,db)
+            move_item(id=src_id, new_parent_id=dest_item_id, db=db)
 
     db.session.commit()
