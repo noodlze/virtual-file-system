@@ -92,7 +92,7 @@
     "/Users/thuypham/virtual_file_system/venv/lib"
   ], // set extra paths for which microsoft python langauge server will to look for imports
   "python.venvPath": "/Users/thuypham/virtual_file_system/venv",
-  "python.pythonPath": "/Users/thuypham/virtual_file_system/venv/bin/python",
+  "python.pythonPath": "venv/bin/python",
   "python.linting.enabled": true,
   "python.jediEnabled": false,
   "python.linting.pycodestyleEnabled": false,

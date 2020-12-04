@@ -1,7 +1,8 @@
+python-dateutil
+alembic==1.0.9
 Flask==1.1.1
 Flask-SQLAlchemy==2.4.1
 flask-migrate==2.5.3
 flask-script==2.0.6
 python-dotenv
-psycopg2
-gunicorn
+gunicorn==19.9.0
