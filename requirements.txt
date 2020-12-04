@@ -1,11 +1,13 @@
 alembic==1.0.9
 astroid==2.4.2
 autopep8==1.5.4
+cachelib==0.1.1
 certifi==2020.11.8
 click==7.1.2
 Flask==1.1.1
 Flask-Migrate==2.5.3
 Flask-Script==2.0.6
+Flask-Session==0.3.2
 Flask-SQLAlchemy==2.4.1
 gunicorn==19.9.0
 isort==5.6.4
