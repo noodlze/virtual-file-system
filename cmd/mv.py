@@ -16,16 +16,20 @@ MV_RE = r'^mv((?: [\"\']?[./a-zA-Z0-9 _-]+[\"\']?){1,})( [\"\']?[./a-zA-Z0-9 _-]
 def validate_mv_cmd_args(match, db):
     # TODO: check if dest is a subfolder of srcs!
     dest = match.group(2)
-    abs_dest = to_abs_path(dest)
-
+    # remove leading space as it messes things up
+    abs_dest = to_abs_path(dest[1:])
+    print("dest={}".format(abs_dest))
     srcs = []
-    srcs_str = match.group(1)
+    srcs_str = match.group(1)[1:]
+    print("srcs_str={}".format(srcs_str))
     BRACKETS_RE = r'[\"\'][./a-zA-Z0-9 _-]+[\"\']'
-    NO_BRACKETS_RE = r'([./a-zA-Z0-9_-])+'  # no space allowed in a src
+    NO_BRACKETS_RE = r'([./a-zA-Z0-9_-]+)'  # no space allowed in a src
     m_brackets = re.findall(BRACKETS_RE, srcs_str)
 
     if len(m_brackets) == 0:
         srcs = re.findall(NO_BRACKETS_RE, srcs_str)
+
+    print("srcs={}".format(srcs))
 
     if not len(srcs):
         raise ValueError(f'mv missing SOURCE...')
@@ -44,19 +48,21 @@ def validate_mv_cmd_args(match, db):
 
 
 def execute_mv_cmd(mv_args, db):
-
+    print("executing mv_cmd: srcs={},srcs_id={},dest={}".format(
+        mv_args.srcs, mv_args.srcs_id, mv_args.dest))
     # TODO: deal with wildcards
     if len(mv_args.srcs) == 1:
+        print("only 1 src")
         # check if parent folder exists
         parent_dest_exists, parent_dest_item_id = item_exists(
-            abs_path=os.path.dirname(mv_args.abs_dest), db=db)
+            abs_path=os.path.dirname(mv_args.dest), db=db)
 
         if not parent_dest_exists:
-            return ValueError(f'mv: no such file or directory: {mv_args.abs_dest}')
+            raise ValueError(f'mv: no such file or directory: {mv_args.dest}')
 
         # check if destination item exists
         dest_exists, dest_item_id = item_exists(
-            abs_path=mv_args.abs_dest, db=db)
+            abs_path=mv_args.dest, db=db)
         if dest_exists:
             dest_item_is_dir = with_row_locks(db.session.query(
                 Item.is_dir)).filter(Item.id == dest_item_id).first()
@@ -78,17 +84,17 @@ def execute_mv_cmd(mv_args, db):
                       new_parent_id=parent_dest_item_id, db=db)
     else:  # many sources
         dest_exists, dest_item_id = item_exists(
-            abs_path=mv_args.abs_dest, db=db)
+            abs_path=mv_args.dest, db=db)
 
         if not dest_exists:
             raise ValueError(
-                f'mv: no such destination file or directory: {mv_args.abs_dest}')
+                f'mv: no such destination file or directory: {mv_args.dest}')
         dest_item_is_dir = with_row_locks(db.session.query(
             Item.is_dir)).filter(Item.id == dest_item_id).first()
 
         if not dest_item_is_dir:
             raise ValueError(
-                f'mv: no such destination directory: {mv_args.abs_dest}')
+                f'mv: no such destination directory: {mv_args.dest}')
 
         for src_id in mv_args.srcs_id:
             move_item(id=src_id, new_parent_id=dest_item_id, db=db)

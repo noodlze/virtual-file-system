@@ -39,6 +39,7 @@ def validate_new_item_name(item_name, parent_id, db):
 
 
 def item_exists(abs_path, db):
+    print("checking if item exists abs_path={}".format(abs_path))
     if abs_path == "/":
         return True, BASE_DIR_ID
 
@@ -53,8 +54,8 @@ def item_exists(abs_path, db):
                                                                             Item.name == allparts[0])).first()
     if not root_item:
         return False, BASE_DIR_ID
-        raise ValueError(
-            f'Item {allparts[0]} in path {abs_path} does not exist')
+        # raise ValueError(
+        #     f'Item {allparts[0]} in path {abs_path} does not exist')
 
     parent_id = root_item.id
 
@@ -172,37 +173,59 @@ def delete_item(id, db):
 
 
 def move_item(id, new_parent_id, db):
+    print("move item id={}->new_parent_id={}".format(id, new_parent_id))
+
     item = with_row_locks(db.session.query(
         Item), of=Item).filter(Item.id == id).first()
 
+    # if directory moving all directory contents to new destination too
+    # identify the relationships we would need to add between item (unchanged item id) and new_parent item
+    select_child_ids = with_row_locks(
+        db.session.query(Ancestors), of=Ancestors).filter(and_(Ancestors.parent_id == id, Ancestors.child_id != id)).all()
+    print("find child ids conds include Ancestors.parent_id={}, ancestors.child_id !={}".format(id, id))
+    # add new rows with update parent_id -> new parent_id
+    new_childs = []
+    for c in select_child_ids:
+        print("child= parent_id={},child_id={},depth={},rank={}".format(
+            c.parent_id, c.child_id, c.depth, c.rank))
+        new_c = Ancestors(parent_id=new_parent_id,
+                          child_id=c.child_id,
+                          depth=c.depth + 1,
+                          rank=f'{new_parent_id},' + c.rank.split(",", maxsplit=1)[1])
+        old_c_new = Ancestors(parent_id=c.parent_id,
+                              child_id=c.child_id, depth=c.depth, rank=c.rank)  # also add the same parent child rel as a new obj
+        print("new child: parent_id={},child_id={},depth={},rank={}".format(
+            new_c.parent_id, new_c.child_id, new_c.depth, new_c.rank))
+        print("new child: parent_id={},child_id={},depth={},rank={}".format(
+            new_c.parent_id, new_c.child_id, new_c.depth, new_c.rank))
+        new_childs.append(new_c)
+        new_childs.append(old_c_new)
+
     # deleting all relationships of id from ancestors table
-    Ancestors.delete_item(id=id, db=db)
+    # do not delete subtree, since we are not changing the item id(folder) on move
+    Ancestors.delete_item(id=id, db=db, subtree=True)
 
-    # updating old parent size, updated_at(when item = directory)
-    child_parent_rel = with_row_locks(db.session.query(
-        Ancestors), of=Ancestors).filter(Ancestors.child == id).first()
+    db.session.commit()
 
-    old_parent = with_row_locks(db.session.query(
-        Item), of=Item).filter(Item.id == child_parent_rel.parent_id).first()
-    if old_parent.is_dir:
-        old_parent.updated_at = datetime.now()
+    # item id has not changed -> we don't want ancestors.delete_item call above to delete these
+    # add new rows for subtree relationships
+    print("adding new child ids=", new_childs)
+    db.session.add_all(new_childs)
 
     # updating new parent size, updated_at(when item = directory)
     new_parent = with_row_locks(db.session.query(
         Item), of=Item).filter(Item.id == new_parent_id).first()
+
     if new_parent.is_dir:
         new_parent.updated_at = datetime.now()
 
     if item.is_dir:  # deleted a directory that may contain items
-        old_parent.size -= item.is_dir + 1
         new_parent.size += item.is_dir + 1
     else:  # only deleted one file
-        old_parent.size -= 1
         new_parent.size += 1
 
-    db.session.add(old_parent)
-
     # adding new relationships between the item and new parent
-    Ancestors.add_item(id, new_parent_id, db)
+    # queries only using parent_id -> should not affect existing rows that have item id as parent_id/child_id
+    Ancestors.add_item(child_id=id, parent_id=new_parent_id, db=db)
 
     db.session.commit()

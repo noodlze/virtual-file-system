@@ -12,6 +12,7 @@ from sqlalchemy import (
     Text,
     and_
 )
+from datetime import datetime
 from sqlalchemy.sql.functions import concat
 from sqlalchemy.sql.expression import cast, literal
 
@@ -35,7 +36,8 @@ class Ancestors(Base):
     @staticmethod
     def add_item(child_id, db, parent_id=None):
         """
-        docstring
+        Add a rel between child and itself(depth=0)
+        Add relationships between child and item in UPPER TREE
         """
         print("Adding to ancestor table child_id={} parent_id={}".format(
             child_id, parent_id))
@@ -52,37 +54,56 @@ class Ancestors(Base):
 
             new_ancestors = [Ancestors(p, c, d, r)
                              for p, c, d, r in select_parent_rows]
+
+            [print("new ancestor: parent_id={},child_id={},depth={},rank={}".format(
+                a.parent_id, a.child_id, a.depth, a.rank)) for a in new_ancestors]
+
             db.session.add_all(new_ancestors)
 
         db.session.add(new_root)
 
     @staticmethod
-    def delete_item(id, db):
-        # must get children items -> delete these too
-        # update parent item size
-        print("Deleting from ancestor table id={}".format(id))
+    def delete_item(id, db, subtree=True, upper_tree=True):
+        """
+        updates parent size and updated_at(if dir)
+
+        deletes UPPER TREE(default=True, optional): relations between parent directories(many lvls up) and item
+
+        deletes SUB TREE(default=True, optional): relations between item and contents (if directory)
+        """
+        # UPDATE parent item
         parent_id = with_row_locks(db.session.query(Ancestors.parent_id), of=Ancestors).filter(
             and_(Ancestors.child_id == id, Ancestors.depth == 1)).first()
 
         print("parent_id of Item={}".format(parent_id))
         parent_item = with_row_locks(db.session.query(
             Item), of=Item).filter(Item.id == parent_id).first()
-        parent_item.update_item_size(size=parent_item.size - 1, db=db)
+        parent_item.update_item_size(
+            size=parent_item.size - 1, db=db)  # update parent dir size
 
-        db.session.add(parent_item)  # update parent dir size
+        if parent_item.is_dir:  # update updated_at() if a directory
+            parent_item.updated_at = datetime.now()
 
-        select_parent_rows = with_row_locks(db.session.query(
-            Ancestors), of=Ancestors).filter(Ancestors.child_id == id).delete(synchronize_session=False)
+        db.session.add(parent_item)
+
+        print("Deleting from ancestor table id={}".format(id))
+        # deleting UPPER TREE
+        if upper_tree:
+            print("Deleting upper tree of item={}".format(id))
+            select_parent_rows = with_row_locks(db.session.query(
+                Ancestors), of=Ancestors).filter(Ancestors.child_id == id).delete(synchronize_session=False)
+
+        # must get children items
+        # deleting SUB TREE
 
         select_child_ids = with_row_locks(
             db.session.query(Ancestors.child_id), of=Ancestors).filter(Ancestors.parent_id == id).all()
-        print("select_child_ids=", select_child_ids)
-        # child_item_ids=[(1,), (2,), (3,), (4,), (5,), (6,), (7,)]
 
-        select_subtree_rows = with_row_locks(db.session.query(
-            Ancestors), of=Ancestors).filter(Ancestors.child_id.in_(select_child_ids)).delete(synchronize_session=False)
+        if subtree:
+            print("Deleting upper tree of item={}, contains items={}".format(
+                id, select_child_ids))
+            select_subtree_rows = with_row_locks(db.session.query(
+                Ancestors), of=Ancestors).filter(Ancestors.child_id.in_(select_child_ids)).delete(synchronize_session=False)
 
-        # also need to delete child items in file and/or item table -> but delegate this to the caller of the func
+        # return the subtree item ids (may be needed by caller)
         return select_child_ids
-        # db.session.delete(select_parent_rows)
-        # db.session.delete(select_subtree_rows)

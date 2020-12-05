@@ -37,7 +37,8 @@ def dir_tree_structure(dir_contents, is_verbose=False):
     # add a row for each item in the folder
 
     for i, (ancestor, item) in enumerate(dir_contents):
-        print(ancestor.rank)
+        print("ancestor:parent_id={},child_id={},depth={},rank={};id:name={}".format(
+            ancestor.parent_id, ancestor.child_id, ancestor.depth, ancestor.rank, item.name))
         level = ancestor.rank.count(',')
 
         is_directory = item.is_dir
