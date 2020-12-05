@@ -1,4 +1,4 @@
-from cmd import CMD_TYPE_MAP, CMD_PARSER, CMD_EXECUTOR
+from cmd import VALID_COMMANDS, CMD_PARSER, CMD_EXECUTOR, CMD_ARGS_CHECKER
 from const import BASE_DIR_ID, PARENT_ID, PARENT_ABS_PATH
 from utils.response import format_response
 from flask import request, session, render_template
@@ -6,7 +6,7 @@ from flask_session.__init__ import Session
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask
 from utils.response import terminal_prefix
-
+import shlex
 import re
 
 USER_INPUT = "user_input"
@@ -25,13 +25,16 @@ db = SQLAlchemy(app)
 # register routes
 
 
-def cmd_type(user_input):
-    for cmd_re, _type in CMD_TYPE_MAP:
-        m = re.fullmatch(cmd_re, user_input)
-        if m:
-            return m, _type
+def get_cmd(cmd_args):
 
-    return None, None
+    if len(cmd_args) == 0:
+        raise ValueError(f'{" ".join(cmd_args)}: No command')
+
+    cmd = (cmd_args[0]).lower()
+    if cmd in VALID_COMMANDS:
+        return cmd
+
+    return None
 
 
 @app.route("/execute", methods=["POST"])
@@ -39,13 +42,25 @@ def cmd_type(user_input):
 def execute_cmd():
     try:
         user_input = request.json.get(USER_INPUT)
-
         print(f'Received console input={user_input}')
-        # helper cmds
 
-        match, input_cmd_type = cmd_type(user_input)
-        if not match:
-            raise ValueError(f'command not found: {user_input}')
+        # parses cmd line string like `cd "1/2/3"` -> ['cd', '1/2/3']
+        # strips parenthesis from each arg
+        # returns a list of args
+        cmd_args = shlex.split(user_input)
+
+        # check first arg to see if valid cmd
+        cmd = get_cmd(cmd_args)
+
+        if not cmd:
+            raise ValueError(f'{cmd_args[0]}: command not found')
+
+        # check if cmd args are valid and sufficient
+        # only pass args
+        # will raise an err if args are valid
+        cmd_args_tuple = CMD_ARGS_CHECKER[cmd](cmd_args[1:])
+
+        # helper cmds
 
         validator_parser_func = CMD_PARSER[input_cmd_type]
 
@@ -56,7 +71,10 @@ def execute_cmd():
         return cmd_excutor_func(cmd_namedtuple, db)
     except Exception as e:
         db.session.rollback()
-        raise e
+        raise e  # for dev purposes
+        # TODO: enable when deploy
+        # raise RuntimeError(  # for production
+        #     f'{user_input}: something went wrong during cmd execution')
 
 
 @app.route("/")
@@ -66,6 +84,7 @@ def terminal_ui():
         session[PARENT_ID] = BASE_DIR_ID
 
     print(session[PARENT_ABS_PATH], session[PARENT_ID])
+
     return render_template("base.html", cur_dir=terminal_prefix(session[PARENT_ABS_PATH]))
 
 
