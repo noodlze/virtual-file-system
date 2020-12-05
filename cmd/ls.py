@@ -2,22 +2,54 @@ from collections import namedtuple
 from cmd.db_helpers import list_child_items
 from flask import session
 from const import PARENT_ID
+from utils.response import InvalidCmdError
+import re
+from cmd import LS_CMD, validate_args_len
 
-LS_CMD = "ls_cmd"
 LS_RE = r'^ls( -l)*( \d+)*$'  # LS -l [LEVEL]
 LsArgs = namedtuple("LsArgs", ["is_verbose", "level"])
 
+LS_USAGE_DOC = '''
+usage: ls [-l] [LEVEL]
+       ls --help
+'''
 
-def validate_ls_cmd_args(match, db):
-    is_verbose = True if match.group(1) else False
-    level = int(match.group(2)) if match.group(2) else 1
+
+def validate_level(level_str):
+    is_no = re.fullmatch(r'\d+', level_str)
+    if not is_no:
+        raise InvalidCmdError(
+            message=f'cr: Expected LEVEL to be a number: {level_str}')
+    level = int(level_str)
+
+    return level
+
+
+def check_ls_cmd_args(cmd_args, db):
+    level = 0
+    is_verbose = False
+    validate_args_len(min_len=0, max_len=2)
+    if len(cmd_args) == 0:
+        return LsArgs(is_verbose, level)
+    elif len(cmd_args) == 1:
+        if cmd_args[0] == '-l':
+            is_verbose = True
+        else:
+            level = validate_level(cmd_args[0])
+    else:  # 2 args
+        if cmd_args[0] == '-l':
+            is_verbose = True
+        else:
+            raise InvalidCmdError(
+                message=f'cr: Invalid option, expecting [-l]: {cmd_args[0]}')
+
+        level = validate_level(cmd_args[1])
 
     return LsArgs(is_verbose, level)
 
-# hack for server to pretty print file structure
-
 
 def dir_tree_structure(dir_contents, is_verbose=False):
+    # hack for server to pretty print file structure
     lines = []
     lines.append(f'Total : {len(dir_contents)}')
 

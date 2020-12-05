@@ -38,42 +38,47 @@ def validate_new_item_name(item_name, parent_id, db):
     return True
 
 
-def item_exists(abs_path, db):
+def item_exists(abs_path, db, check_is_dir=False):
+    """
+    Check if item exists,
+    if check_is_dir is passed also checks whether item is a dir
+
+    returns (Bool, Int)
+        = (whether item exists + is dir(if check requested), item id of deepest child item in path)
+    """
     print("checking if item exists abs_path={}".format(abs_path))
     if abs_path == "/":
         return True, BASE_DIR_ID
 
-    allparts = splitall(abs_path)
+    allparts = abs_path.split("/")
 
-    child_item_ids = db.session.query(
-        Ancestors.child_id).filter(Ancestors.child_id != Ancestors.parent_id).distinct().all()
+    # allparts[0] == ""
+    root_item = with_row_locks(db.session.query(
+        Item), of=Item).filter(Item.id == BASE_DIR_ID).first()
 
-    print(f'child_item_ids={child_item_ids}')
-    print(f'{allparts[0]}')
-    root_item = with_row_locks(db.session.query(Item), of=Item).filter(and_(not_(Item.id.in_(child_item_ids)),
-                                                                            Item.name == allparts[0])).first()
-    if not root_item:
-        return False, BASE_DIR_ID
-        # raise ValueError(
-        #     f'Item {allparts[0]} in path {abs_path} does not exist')
-
-    parent_id = root_item.id
-
-    for item_name in allparts[1:]:
+    parent_item = root_item
+    # if abs_path contains many subdirectories
+    for item_name in allparts[1:]: # skips root
+        # get parent folder contents
         child_item_ids = db.session.query(Ancestors.child_id).filter(
-            Ancestors.parent_id == parent_id).distinct().all()
+            Ancestors.parent_id == parent_item.id).distinct().all()
 
-        item_id = with_row_locks(db.session.query(Item), of=Item).filter(and_(Item.id.in_(child_item_ids),
-                                                                              Item.name == item_name)).first()
-        if not item_id:
+        # check if item exists in parent folder
+        child_item = with_row_locks(db.session.query(Item), of=Item).filter(and_(Item.id.in_(child_item_ids),
+                                                                                 Item.name == item_name)).first()
+        if not child_item:
+            # item does not exist in parent
             return False, BASE_DIR_ID
-            raise ValueError(
-                f'Item {item_name} in path {abs_path} does not exist')
 
-        parent_id = item_id.id
+        # item exists in parent
+        # update parent item
+        parent_item = child_item
+
+    if check_is_dir and not parent_item.is_dir:  # exists but not a dir
+        return False, parent_item.id
 
     # deepest subdirectory (item) id / current directory id
-    return True, parent_id
+    return True, parent_item.id
 
 
 def list_child_items(parent_id, db, depth=1):

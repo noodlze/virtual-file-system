@@ -8,11 +8,10 @@ from const import PARENT_ID
 
 # rm PATH
 RM_RE = r'^rm [\"\']?([*./a-zA-Z0-9 _-]+)[\"\']?$'
-RM_CMD = "rm_cmd"
 RmArgs = namedtuple("RmArgs", ["path", "item_id"])
 
 
-def validate_rm_cmd_args(match, db):
+def check_rm_cmd_args(match, db):
     # validator and args extractor
     # returns namedtuple if valid
     path = match.group(1)

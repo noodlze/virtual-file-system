@@ -6,14 +6,13 @@ from models.item import Item
 from collections import namedtuple
 
 
-MV_CMD = "mv_cmd"
 MvArgs = namedtuple("MvArgs", ["srcs", "srcs_id", "dest"])
 # mv SOURCE DESTINATION
 # mv SOURCE... DESTINATION
 MV_RE = r'^mv((?: [\"\']?[./a-zA-Z0-9 _-]+[\"\']?){1,})( [\"\']?[./a-zA-Z0-9 _-]+[\"\']?)$'
 
 
-def validate_mv_cmd_args(match, db):
+def check_mv_cmd_args(match, db):
     # TODO: check if dest is a subfolder of srcs!
     dest = match.group(2)
     # remove leading space as it messes things up
