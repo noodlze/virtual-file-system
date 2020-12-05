@@ -14,9 +14,9 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'vnVl8ycSmt6b6veHk4KP')
     SESSION_TYPE = 'sqlalchemy'
     SESSION_SQLALCHEMY_TABLE = 'sessions'
-
+    # seems like heroku cannot load env file -> include engine uri here though bad pracice
     SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'ENGINE_URI', 'postgresql+psycopg2://thuypham:root@localhost:5432/file_system')
+        'ENGINE_URI', 'postgres://qfaqxzdlxtirlz:0397be39cfcaf0bbd34053427baf3b64ab1d08c56fc3dab5c7835bf59514b10a@ec2-3-231-48-230.compute-1.amazonaws.com:5432/dbke29vrr6jfru?sslmode=require')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SESSION_COOKIE_NAME = 'session'
