@@ -16,7 +16,7 @@ class Config:
     SESSION_SQLALCHEMY_TABLE = 'sessions'
 
     SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'ENGINE_URI', 'postgres://qfaqxzdlxtirlz:0397be39cfcaf0bbd34053427baf3b64ab1d08c56fc3dab5c7835bf59514b10a@ec2-3-231-48-230.compute-1.amazonaws.com:5432/dbke29vrr6jfru?sslmode=require')
+        'ENGINE_URI', 'postgresql+psycopg2://thuypham:root@localhost:5432/file_system')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SESSION_COOKIE_NAME = 'session'
