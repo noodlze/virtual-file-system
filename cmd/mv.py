@@ -79,11 +79,11 @@ def execute_mv_cmd(mv_args, db=None):
                 delete_item(id=dest_item_id)
                 # insert new file in the same parent directory as the deleted destination file
                 move_item(
-                    id=mv_args.src_id[0], new_parent_id=parent_dest_item_id)
+                    id=mv_args.srcs_id[0], new_parent_id=parent_dest_item_id)
         else:
             # TODO: still uncertain about whether I understood this requirement correctly
             # move the src to the parent_destination folder
-            move_item(id=mv_args.src_id[0],
+            move_item(id=mv_args.srcs_id[0],
                       new_parent_id=parent_dest_item_id)
     else:  # many sources
         dest_exists, dest_item_id = item_exists(
@@ -101,5 +101,3 @@ def execute_mv_cmd(mv_args, db=None):
 
         for src_id in mv_args.srcs_id:
             move_item(id=src_id, new_parent_id=dest_item_id)
-
-    db.session.commit()

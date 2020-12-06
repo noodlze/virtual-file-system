@@ -107,7 +107,4 @@ def execute_cr_cmd(cr_args, db=None):
     resp = {
         "response": "Created {}".format(cr_args.path)
     }
-
-    db.session.commit()
-
     return resp

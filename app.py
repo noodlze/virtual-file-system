@@ -9,6 +9,7 @@ from utils.response import terminal_prefix
 import shlex
 import re
 from utils.db_session import provide_db_session
+import traceback
 
 USER_INPUT = "user_input"
 
@@ -64,13 +65,27 @@ def execute_cmd():
 
         cmd_excutor_func = CMD_EXECUTOR[cmd]
 
-        return cmd_excutor_func(cmd_namedtuple)
+        res = cmd_excutor_func(cmd_namedtuple)
+
+        db.session.commit()
+
+        return res
     except Exception as e:
+        print("running db.session.rollback()")
         db.session.rollback()
         raise e  # for dev purposes
         # TODO: enable when deploy
         # raise RuntimeError(  # for production
         #     f'{user_input}: something went wrong during cmd execution')
+    finally:
+        # close the Session.  This will expunge any remaining
+        # objects as well as reset any existing SessionTransaction
+        # state.  Neither of these steps are usually essential.
+        # However, if the commit() or rollback() itself experienced
+        # an unanticipated internal failure (such as due to a mis-behaved
+        # user-defined event handler), .close() will ensure that
+        # invalid state is removed.
+        db.session.close()
 
 
 @app.route("/")
@@ -82,6 +97,19 @@ def terminal_ui():
     print(session[PARENT_ABS_PATH], session[PARENT_ID])
 
     return render_template("base.html", cur_dir=terminal_prefix(session[PARENT_ABS_PATH]))
+
+
+@app.teardown_request
+def show_teardown(exception):
+    if exception:
+        print("teardown_request received an exception:")
+        traceback.format_exc()
+        # db session rollback
+        db.session.rollback()
+    else:
+        print("Request went through without passing an exception.")
+
+    print('app.teardown_request')
 
 
 if __name__ == '__main__':

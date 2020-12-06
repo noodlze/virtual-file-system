@@ -7,8 +7,7 @@ from models.item import Item
 from models.file import File
 from sqlalchemy import (
     func,
-    select,
-    not_
+    select
 )
 from models import with_row_locks
 from utils.db_session import provide_db_session
@@ -156,8 +155,6 @@ def add_new_item(name, item_parent_id, db=None, data=None):
 
             db.session.add(parent_item)
 
-        db.session.commit()
-
         return new_item_id
     except Exception as e:
         db.session.rollback()
@@ -180,64 +177,58 @@ def delete_item(id, db=None):
     with_row_locks(db.session.query(Item), of=Item).filter(
         Item.id.in_(child_item_ids+[id])).delete(synchronize_session=False)
 
-    db.session.commit()
-
 
 @provide_db_session
 def move_item(id, new_parent_id, db=None):
-    print("move item id={}->new_parent_id={}".format(id, new_parent_id))
+    # old_parent
+    old_parent_id = with_row_locks(db.session.query(Ancestors.parent_id), of=Ancestors).filter(and_(Ancestors.child_id == id,
+                                                                                                    Ancestors.depth == 1)).first()
 
-    item = with_row_locks(db.session.query(
-        Item), of=Item).filter(Item.id == id).first()
+    # define subtree as id + all childs of id
+    childs = with_row_locks(db.session.query(
+        Ancestors), of=Ancestors).filter(Ancestors.parent_id == id).all()
+    subtree_ids = [item.child_id for item in childs]
+    subtree = with_row_locks(db.session.query(
+        Ancestors), of=Ancestors).filter(Ancestors.parent_id.in_(subtree_ids)).all()
 
-    # if directory moving all directory contents to new destination too
-    # identify the relationships we would need to add between item (unchanged item id) and new_parent item
-    select_child_ids = with_row_locks(
-        db.session.query(Ancestors), of=Ancestors).filter(and_(Ancestors.parent_id == id, Ancestors.child_id != id)).all()
-    print("find child ids conds include Ancestors.parent_id={}, ancestors.child_id !={}".format(id, id))
-    # add new rows with update parent_id -> new parent_id
-    new_childs = []
-    for c in select_child_ids:
-        print("child= parent_id={},child_id={},depth={},rank={}".format(
-            c.parent_id, c.child_id, c.depth, c.rank))
-        new_c = Ancestors(parent_id=new_parent_id,
-                          child_id=c.child_id,
-                          depth=c.depth + 1,
-                          rank=f'{new_parent_id},' + c.rank.split(",", maxsplit=1)[1])
-        old_c_new = Ancestors(parent_id=c.parent_id,
-                              child_id=c.child_id, depth=c.depth, rank=c.rank)  # also add the same parent child rel as a new obj
-        print("new child: parent_id={},child_id={},depth={},rank={}".format(
-            new_c.parent_id, new_c.child_id, new_c.depth, new_c.rank))
-        print("new child: parent_id={},child_id={},depth={},rank={}".format(
-            new_c.parent_id, new_c.child_id, new_c.depth, new_c.rank))
-        new_childs.append(new_c)
-        new_childs.append(old_c_new)
+    # delete relationships between upper tree of the tree + subtree
+    with_row_locks(db.session.query(
+        Ancestors), of=Ancestors).filter(and_(Ancestors.child_id.in_(subtree_ids),
+                                              not_(Ancestors.parent_id.in_(subtree_ids)))).delete(synchronize_session=False)
 
-    # deleting all relationships of id from ancestors table
-    # do not delete subtree, since we are not changing the item id(folder) on move
-    Ancestors.delete_item(id=id, subtree=True)
+    # add relationships between (new parent + upper tree of new_parent) + subtree
+    new_parent_upper_tree = with_row_locks(db.session.query(Ancestors), of=Ancestors).filter(
+        Ancestors.child_id == new_parent_id).all()
+    for new_upper_item in new_parent_upper_tree:
+        upper_parent_id = new_upper_item.parent_id
 
-    db.session.commit()
+        # distance from (upper_tree_item -> new_parent_id) = upper_tree_depth
+        # from (new_parent -> item_id) = 1
+        # from (item_id -> child_id) = subtree_item_depth
+        upper_tree_depth = new_upper_item.depth
+        upper_tree_rank = new_upper_item.rank
 
-    # item id has not changed -> we don't want ancestors.delete_item call above to delete these
-    # add new rows for subtree relationships
-    print("adding new child ids=", new_childs)
-    db.session.add_all(new_childs)
+        for subtree_item in childs:
+            new_rel = Ancestors(parent_id=upper_parent_id,
+                                child_id=subtree_item.child_id,
+                                depth=upper_tree_depth + subtree_item.depth + 1,
+                                rank=f'{upper_tree_rank},{subtree_item.rank}')
+            db.session.add(new_rel)
 
-    # updating new parent size, updated_at(when item = directory)
+    # updating old_parent size + updated_at(if dir)
+    # updating new_parent size + updated_at(if dir)
     new_parent = with_row_locks(db.session.query(
         Item), of=Item).filter(Item.id == new_parent_id).first()
+    old_parent = with_row_locks(db.session.query(Item), of=Item).filter(
+        Item.id == old_parent_id).first()
 
     if new_parent.is_dir:
         new_parent.updated_at = datetime.now()
-
-    if item.is_dir:  # deleted a directory that may contain items
-        new_parent.size += item.is_dir + 1
-    else:  # only deleted one file
         new_parent.size += 1
 
-    # adding new relationships between the item and new parent
-    # queries only using parent_id -> should not affect existing rows that have item id as parent_id/child_id
-    Ancestors.add_item(child_id=id, parent_id=new_parent_id)
+    if old_parent.is_dir:
+        old_parent.updated_at = datetime.now()
+        old_parent.size -= 1
+    db.session.add(new_parent)
+    db.session.add(old_parent)
 
-    db.session.commit()

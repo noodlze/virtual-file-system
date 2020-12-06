@@ -24,7 +24,7 @@ class Item(Base):
     def __init__(self, name, updated_at, size=0, is_dir=False):
         self.name = name
         self.size = size
-        self.is_dir = False
+        self.is_dir = is_dir
         self. updated_at = updated_at
 
     @staticmethod

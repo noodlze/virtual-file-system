@@ -18,7 +18,7 @@ def check_ls_cmd_args(cmd_args, db=None):
 
     ls_parser.add_argument('-l', action='store_true')
     ls_parser.add_argument(
-        'level', type=int, metavar='LEVEL', nargs='?', default=None)
+        'level', type=int, metavar='LEVEL', nargs='?', default=1)
 
     try:
         parsed_args = ls_parser.parse_args(cmd_args)
@@ -78,7 +78,7 @@ def dir_tree_structure(dir_contents, is_verbose=False):
                                        item.name,
                                        "/" if is_directory else ""))
 
-    return "\n".join(lines)
+    return lines
 
 
 @provide_db_session

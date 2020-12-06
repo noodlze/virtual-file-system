@@ -45,4 +45,4 @@ def execute_rm_cmd(rm_args, db=None):
     print("PARENT_ID={}, item_id={}".format(
         session[PARENT_ID], rm_args.item_id))
     delete_item(id=rm_args.item_id)
-    db.session.commit()
+
