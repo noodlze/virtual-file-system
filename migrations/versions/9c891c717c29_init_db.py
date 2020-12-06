@@ -52,7 +52,7 @@ def upgrade():
                                       sa.Column('rank', sa.Text(),
                                                 nullable=False),
                                       sa.PrimaryKeyConstraint(
-                                          'parent_id', 'child_id'),
+                                          'rank'),
                                       sa.ForeignKeyConstraint(
                                           ['parent_id'], ['item.id']),
                                       sa.ForeignKeyConstraint(['child_id'], ['item.id']))
@@ -61,7 +61,7 @@ def upgrade():
                    [{"id": 0, "name": "/", "created_at": datetime.now(), "updated_at": datetime.now(), "size": 0, "is_dir": True}])
 
     op.bulk_insert(ancestors_table,
-                   [{"parent_id": 0, "child_id": 0, "depth": 0, "rank": "1"}])
+                   [{"parent_id": 0, "child_id": 0, "depth": 0, "rank": "0"}])
 
 
 def downgrade():

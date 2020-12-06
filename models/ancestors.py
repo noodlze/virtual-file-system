@@ -21,10 +21,10 @@ from utils.db_session import provide_db_session
 class Ancestors(Base):
     __tablename__ = "ancestors"
 
-    parent_id = Column(Integer, ForeignKey('item.id'), primary_key=True)
-    child_id = Column(Integer, ForeignKey('item.id'),  primary_key=True)
+    parent_id = Column(Integer, ForeignKey('item.id'))
+    child_id = Column(Integer, ForeignKey('item.id'))
     depth = Column(Integer)
-    rank = Column(Text)
+    rank = Column(Text, primary_key=True)
 
     # parent_item = relationship(Item, backref)
 
@@ -56,9 +56,6 @@ class Ancestors(Base):
 
             new_ancestors = [Ancestors(p, c, d, r)
                              for p, c, d, r in select_parent_rows]
-
-            [print("new ancestor: parent_id={},child_id={},depth={},rank={}".format(
-                a.parent_id, a.child_id, a.depth, a.rank)) for a in new_ancestors]
 
             db.session.add_all(new_ancestors)
 
