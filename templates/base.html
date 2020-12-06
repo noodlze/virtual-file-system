@@ -16,11 +16,11 @@
     <input type="text" value="{{ cur_dir }}" id="txtInput">
   </label>
 
-  <div id="cmdResponse">
+  <div style="white-space: pre-wrap" id="cmdResponse">
 
   </div>
 
-  <div id="errHighlight"></div>
+  <div style="white-space: pre-wrap" id="errHighlight"></div>
 
   <script>
     var cur_dir = JSON.parse('{{  cur_dir | tojson }}'); // get
@@ -51,26 +51,29 @@
 
               if (typeof resp_elem !== 'undefined' && resp_elem !== null) {
                 var exec_resp = res.response;
-                if (exec_resp !== undefined) {
-                  // ls -l returns an array of folder item contents
-                  if (exec_resp.constructor === Array) {
-                    console.log("is an Array");
-                    for (var i = 0; i < exec_resp.length; i++) {
-                      const p = document.createElement('p');
-                      const pre = document.createElement('pre');
-                      const text = document.createTextNode(exec_resp[i]);
-                      pre.appendChild(text);
-                      p.appendChild(pre);
-                      resp_elem.appendChild(p);
-                    }
-                  } else {
-                    // text
-                    const pre = document.createElement('pre');
-                    const text = document.createTextNode(exec_resp);
-                    pre.appendChild(text);
-                    resp_elem.appendChild(pre);
-                  }
-                }
+                //   if (exec_resp !== undefined) {
+                //     // ls -l returns an array of folder item contents
+                //     if (exec_resp.constructor === Array) {
+                //       console.log("is an Array");
+                //       for (var i = 0; i < exec_resp.length; i++) {
+                //         const p = document.createElement('p');
+                //         const pre = document.createElement('pre');
+                //         const text = document.createTextNode(exec_resp[i]);
+                //         pre.appendChild(text);
+                //         p.appendChild(pre);
+                //         resp_elem.appendChild(p);
+                //       }
+                //     } else {
+                //       // text
+                //       const pre = document.createElement('pre');
+                //       const text = document.createTextNode(exec_resp);
+                //       pre.appendChild(text);
+                //       resp_elem.appendChild(pre);
+                //     }
+                // }
+
+                resp_elem.innerHTML = exec_resp;
+
                 var new_dir = res.newDir;
                 if (new_dir !== undefined) {
                   console.log("new dir is not undefined");

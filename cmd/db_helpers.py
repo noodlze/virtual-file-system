@@ -11,6 +11,7 @@ from sqlalchemy import (
     not_
 )
 from models import with_row_locks
+from utils.db_session import provide_db_session
 
 
 def splitall(path):
@@ -29,7 +30,8 @@ def splitall(path):
     return allparts
 
 
-def validate_new_item_name(item_name, parent_id, db):
+@provide_db_session
+def validate_new_item_name(item_name, parent_id, db=None):
     same_folder_items = db.session.query(Ancestors).join(
         Item, Item.id == Ancestors.child_id).filter(Ancestors.parent_id == parent_id).distinct().all()
 
@@ -38,7 +40,8 @@ def validate_new_item_name(item_name, parent_id, db):
     return True
 
 
-def item_exists(abs_path, db, check_is_dir=False):
+@provide_db_session
+def item_exists(abs_path, db=None, check_is_dir=False):
     """
     Check if item exists,
     if check_is_dir is passed also checks whether item is a dir
@@ -58,7 +61,7 @@ def item_exists(abs_path, db, check_is_dir=False):
 
     parent_item = root_item
     # if abs_path contains many subdirectories
-    for item_name in allparts[1:]: # skips root
+    for item_name in allparts[1:]:  # skips root
         # get parent folder contents
         child_item_ids = db.session.query(Ancestors.child_id).filter(
             Ancestors.parent_id == parent_item.id).distinct().all()
@@ -81,7 +84,8 @@ def item_exists(abs_path, db, check_is_dir=False):
     return True, parent_item.id
 
 
-def list_child_items(parent_id, db, depth=1):
+@provide_db_session
+def list_child_items(parent_id, db=None, depth=1):
 
     query = db.session.query(Ancestors, Item).filter(and_(Ancestors.parent_id == parent_id,
                                                           Ancestors.depth <= depth,
@@ -104,7 +108,8 @@ def list_child_items(parent_id, db, depth=1):
     # return with_size
 
 
-def get_child_item(parent_id, child_name, db):
+@provide_db_session
+def get_child_item(parent_id, child_name, db=None):
     """
     given parent id and child name -> return child id else None if doesn't exist
 
@@ -119,21 +124,21 @@ def get_child_item(parent_id, child_name, db):
     return r.id if r else None
 
 
-def add_new_item(name, item_parent_id, db, data=None):
+@provide_db_session
+def add_new_item(name, item_parent_id, db=None, data=None):
     try:
         print(f'add new item {name} {item_parent_id}')
         # add to item table
         is_dir = True if data == None else False
         size = len(data) if data else 0
-        new_item_id = Item.add_item(db=db,
-                                    name=name, size=size, is_dir=is_dir)
+        new_item_id = Item.add_item(name=name, size=size, is_dir=is_dir)
 
         # add to file table
         if data:
-            File.add_item(db=db, file_id=new_item_id, data=data)
+            File.add_item(file_id=new_item_id, data=data)
 
         # add to ancestors table
-        Ancestors.add_item(db=db, child_id=new_item_id,
+        Ancestors.add_item(child_id=new_item_id,
                            parent_id=item_parent_id)
 
         # update item_parent_id size
@@ -141,7 +146,7 @@ def add_new_item(name, item_parent_id, db, data=None):
             Item.id == item_parent_id).first()
 
         if parent_item:
-            parent_item.update_item_size(size=parent_item.size + 1, db=db)
+            parent_item.update_item_size(size=parent_item.size + 1)
             # Item(id=parent_item.id,
             #      name=parent_item.name,
             #      created_at=parent_item.created_at,
@@ -159,11 +164,12 @@ def add_new_item(name, item_parent_id, db, data=None):
         raise e
 
 
-def delete_item(id, db):
+@provide_db_session
+def delete_item(id, db=None):
     # delete from ancestors table
     # NOTE: must delete before item to avoid fk violation
     # returns children items that need to be deleted
-    child_item_ids = Ancestors.delete_item(id=id, db=db)
+    child_item_ids = Ancestors.delete_item(id=id)
 
     # delete from file table
     # NOTE: must delete before item to avoid fk violation
@@ -177,7 +183,8 @@ def delete_item(id, db):
     db.session.commit()
 
 
-def move_item(id, new_parent_id, db):
+@provide_db_session
+def move_item(id, new_parent_id, db=None):
     print("move item id={}->new_parent_id={}".format(id, new_parent_id))
 
     item = with_row_locks(db.session.query(
@@ -208,7 +215,7 @@ def move_item(id, new_parent_id, db):
 
     # deleting all relationships of id from ancestors table
     # do not delete subtree, since we are not changing the item id(folder) on move
-    Ancestors.delete_item(id=id, db=db, subtree=True)
+    Ancestors.delete_item(id=id, subtree=True)
 
     db.session.commit()
 
@@ -231,6 +238,6 @@ def move_item(id, new_parent_id, db):
 
     # adding new relationships between the item and new parent
     # queries only using parent_id -> should not affect existing rows that have item id as parent_id/child_id
-    Ancestors.add_item(child_id=id, parent_id=new_parent_id, db=db)
+    Ancestors.add_item(child_id=id, parent_id=new_parent_id)
 
     db.session.commit()

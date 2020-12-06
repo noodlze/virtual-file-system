@@ -1,103 +1,82 @@
 from const import BASE_DIR_ID
 import os
 import re
+import argparse
 from utils.response import InvalidCmdError
 from utils.paths import to_abs_path
+from utils.db_session import provide_db_session
 from cmd.db_helpers import item_exists, splitall, add_new_item
 from collections import namedtuple
-from cmd import CR_CMD, validate_args_len
+import sys
 
-# CR -p PATH [DATA]
-CR_RE = r'^cr( -p)*( [\"\']?[./a-zA-Z0-9 _-]+[\"\']?)( [\"\']?.+[\"\']?)*$'
+# CR [-p] PATH [DATA]
 CrArgs = namedtuple("CrArgs", ["requires_create", "parent_id", "path", "data"])
 FILE_NAME_RE = r'^[a-zA-Z0-9 _-]+$'
 
-CR_USAGE_DOC = '''
-usage: cr [-p] PATH [DATA]
-       cr --help
-'''
 
-
-def valid_item_name(name):
+def validate_item_name(name):
     _name, ext = os.path.splitext(name)
-    return True if re.fullmatch(FILE_NAME_RE, _name) else False
-
-
-def validate_cr_path(path):
-    abs_path = to_abs_path(path)
-
-    # validate filename
-    basename = os.path.basename(path)  # if file then also contains ext
-    valid_name = valid_item_name(basename)
+    valid_name = re.fullmatch(FILE_NAME_RE, _name)
 
     if not valid_name:
         raise InvalidCmdError(
-            message=f'cr: Invalid filename in PATH arg: {path}')
-
-    return abs_path
+            message=f'cr: Invalid filename in PATH arg: {name}')
 
 
-def check_cr_cmd_args(cmd_args, db):
-    # min = 1 args (PATH), max = 3 args (-p PATH [DATA])
-    validate_args_len(min_len=1, max_len=3)
+@provide_db_session
+def check_cr_cmd_args(cmd_args, db=None):
+    cr_parser = argparse.ArgumentParser(description="create folders/files")
 
-    if len(cmd_args) == 1 and cmd_args[0] == "--help":
-        raise InvalidCmdError(
-            message=f'User requested usage docs of `cr`', ui_msg=CR_USAGE_DOC)
+    cr_parser.add_argument('path', metavar='PATH', nargs=1)
+    cr_parser.add_argument('-p', action='store_true')
+    cr_parser.add_argument('data', metavar='DATA', nargs='?', default=None)
 
-    abs_path = None
+    try:
+        parsed_args = cr_parser.parse_args(cmd_args)
 
-    # only one arg
-    if len(cmd_args) == 1:  # only specify path
-        if cmd_args[0] == '-p':
+        # extract and validate value of path, allow_create, data args
+        allow_create = True if parsed_args.p else False
+
+        path = parsed_args.path[0]
+        abs_path = to_abs_path(path)
+        # cr path arg cannot contain *
+        if '*' in abs_path:
             raise InvalidCmdError(
-                message=f'cr: Missing required PATH arg: {" ".join(cmd_args)}')
+                message=f'cr: PATH cannot contain *: {" ".join(cmd_args)}')
+        validate_item_name(os.path.basename(abs_path))
 
-        abs_path = validate_cr_path(cmd_args[0])
+        data = parsed_args.data
 
-    # identify allow_create and abs_path variable value
-    # first arg either -p / PATH
-    allow_create = False
-    to_process_indx = 0
-    if cmd_args[0] == "-p":
-        allow_create = True
-        abs_path = validate_cr_path(cmd_args[1])
-        to_process_indx = 2
-    else:
-        abs_path = validate_cr_path(cmd_args[0])
-        to_process_index = 1
-     # sure to have abs_path and allow_create variables at this point
+        # check if abs_path exists
+        i_exists, _ = item_exists(abs_path=abs_path)
+        print(f'does item {abs_path} exist={i_exists}')
+        if i_exists:
+            raise InvalidCmdError(message=f'cr: {abs_path}: File exists')
 
-    # path given to cr cmd cannot contain *
-    if abs_path.contains("*"):
-        raise InvalidCmdError(
-            message=f'cr: PATH cannot contain *: {" ".join(cmd_args)}')
+        # if item does not exist, does the parent dir exist?
+        parent_exists, parent_id = item_exists(
+            abs_path=os.path.dirname(abs_path))
 
-    # check if data arg given
-    data = None
-    if len(cmd_args) > to_process_index:
-        data = cmd_args[to_process_index]
+        # parent dir does not exist + unable to create parent dir
+        if not parent_exists and not allow_create:
+            raise InvalidCmdError(
+                message=f'cr no such file or directory: {abs_path}')
 
-    # check if abs_path exists
-    i_exists, _ = item_exists(abs_path=abs_path, db=db)
-    print(f'does item {abs_path} exist={i_exists}')
-    if i_exists:
-        raise InvalidCmdError(message=f'cr: {abs_path}: File exists')
+        requires_create = True if (
+            allow_create and not parent_exists) else False
 
-    # if item does not exist, does the parent dir exist?
-    parent_exists, parent_id = item_exists(
-        abs_path=os.path.dirname(abs_path), db=db)
+        return CrArgs(requires_create, parent_id, abs_path, data)
 
-    if not parent_exists and not allow_create:
-        raise InvalidCmdError(
-            message=f'cr no such file or directory: {abs_path}')
+    except SystemExit as e:
+        # (str(e) == "0") -> --help/-h
+        err_msg = cr_parser.format_help() \
+            if str(e) == "0" else cr_parser.format_usage()
 
-    requires_create = True if (allow_create and not parent_exists) else False
-
-    return CrArgs(requires_create, parent_id, abs_path, data)
+        raise InvalidCmdError(message=err_msg)
 
 
-def execute_cr_cmd(cr_args, db):
+@provide_db_session
+def execute_cr_cmd(cr_args, db=None):
     print("execute cr cmd", cr_args.path)
     print("PARENT_ID={},path={},data={}".format(
         cr_args.parent_id, cr_args.path, cr_args.data))
@@ -113,19 +92,18 @@ def execute_cr_cmd(cr_args, db):
         for p in all_parts[:-1]:  # create everything in parent directories
             print("Checking item {}".format(p))
             _path_itr += p
-            exists, item_id = item_exists(abs_path=_path_itr, db=db)
+            exists, item_id = item_exists(abs_path=_path_itr)
             if exists:  # already exists
                 parent_id = item_id
             else:  # add new item
                 parent_id = add_new_item(
-                    name=p, item_parent_id=parent_id, db=db)  # create a directory
+                    name=p, item_parent_id=parent_id)  # create a directory
     else:
         parent_id = cr_args.parent_id
 
     # add new item to the parent id
     print("cr_args.data=", cr_args.data)
-    add_new_item(name=item_name, item_parent_id=parent_id,
-                 db=db, data=cr_args.data)
+    add_new_item(name=item_name, item_parent_id=parent_id, data=cr_args.data)
     resp = {
         "response": "Created {}".format(cr_args.path)
     }

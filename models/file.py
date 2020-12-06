@@ -6,7 +6,7 @@ from sqlalchemy import (
 )
 from models import with_row_locks
 from models import Base
-
+from utils.db_session import provide_db_session
 
 class File(Base):
     __tablename__ = "file"
@@ -19,14 +19,16 @@ class File(Base):
         self.data = data
 
     @staticmethod
-    def add_item(file_id, data, db):
+    @provide_db_session
+    def add_item(file_id, data, db=None):
         print("Adding to file table file_id={} data={}".format(file_id, data))
         new_file = File(file_id, data)
 
         db.session.add(new_file)
 
     @staticmethod
-    def delete_item(id, db):
+    @provide_db_session
+    def delete_item(id, db=None):
         print("Deleting from file table id={}".format(id))
 
         with_row_locks(db.session.query(File), of=File).filter(

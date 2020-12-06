@@ -1,4 +1,4 @@
-from cmd import VALID_COMMANDS, CMD_PARSER, CMD_EXECUTOR, CMD_ARGS_CHECKER
+from cmd import VALID_COMMANDS, CMD_EXECUTOR, CMD_ARGS_CHECKER
 from const import BASE_DIR_ID, PARENT_ID, PARENT_ABS_PATH
 from utils.response import format_response
 from flask import request, session, render_template
@@ -8,6 +8,7 @@ from flask import Flask
 from utils.response import terminal_prefix
 import shlex
 import re
+from utils.db_session import provide_db_session
 
 USER_INPUT = "user_input"
 
@@ -28,7 +29,8 @@ db = SQLAlchemy(app)
 def get_cmd(cmd_args):
 
     if len(cmd_args) == 0:
-        raise ValueError(f'{" ".join(cmd_args)}: No command')
+        cmd = " ".join(cmd_args)
+        raise ValueError(f'{cmd}: No command')
 
     cmd = (cmd_args[0]).lower()
     if cmd in VALID_COMMANDS:
@@ -58,17 +60,11 @@ def execute_cmd():
         # check if cmd args are valid and sufficient
         # only pass args
         # will raise an err if args are valid
-        cmd_args_tuple = CMD_ARGS_CHECKER[cmd](cmd_args[1:])
+        cmd_namedtuple = CMD_ARGS_CHECKER[cmd](cmd_args[1:])
 
-        # helper cmds
+        cmd_excutor_func = CMD_EXECUTOR[cmd]
 
-        validator_parser_func = CMD_PARSER[input_cmd_type]
-
-        cmd_namedtuple = validator_parser_func(match, db)
-
-        cmd_excutor_func = CMD_EXECUTOR[input_cmd_type]
-
-        return cmd_excutor_func(cmd_namedtuple, db)
+        return cmd_excutor_func(cmd_namedtuple)
     except Exception as e:
         db.session.rollback()
         raise e  # for dev purposes

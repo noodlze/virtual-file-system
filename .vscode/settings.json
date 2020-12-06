@@ -90,7 +90,7 @@
   // Python
   "python.autoComplete.extraPaths": [
     "/Users/thuypham/virtual_file_system/venv/lib"
-  ], // set extra paths for which microsoft python langauge server will to look for imports
+  ],
   "python.venvPath": "/Users/thuypham/virtual_file_system/venv",
   "python.linting.enabled": true,
   "python.jediEnabled": false,

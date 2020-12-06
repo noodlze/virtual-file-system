@@ -15,6 +15,7 @@ from sqlalchemy import (
 from datetime import datetime
 from sqlalchemy.sql.functions import concat
 from sqlalchemy.sql.expression import cast, literal
+from utils.db_session import provide_db_session
 
 
 class Ancestors(Base):
@@ -34,7 +35,8 @@ class Ancestors(Base):
         self.rank = rank
 
     @staticmethod
-    def add_item(child_id, db, parent_id=None):
+    @provide_db_session
+    def add_item(child_id, db=None, parent_id=None):
         """
         Add a rel between child and itself(depth=0)
         Add relationships between child and item in UPPER TREE
@@ -63,7 +65,8 @@ class Ancestors(Base):
         db.session.add(new_root)
 
     @staticmethod
-    def delete_item(id, db, subtree=True, upper_tree=True):
+    @provide_db_session
+    def delete_item(id, db=None, subtree=True, upper_tree=True):
         """
         updates parent size and updated_at(if dir)
 
@@ -79,7 +82,7 @@ class Ancestors(Base):
         parent_item = with_row_locks(db.session.query(
             Item), of=Item).filter(Item.id == parent_id).first()
         parent_item.update_item_size(
-            size=parent_item.size - 1, db=db)  # update parent dir size
+            size=parent_item.size - 1)  # update parent dir size
 
         if parent_item.is_dir:  # update updated_at() if a directory
             parent_item.updated_at = datetime.now()

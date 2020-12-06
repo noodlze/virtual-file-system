@@ -8,6 +8,7 @@ from sqlalchemy import (
 from datetime import datetime
 from models import Base
 from models import with_row_locks
+from utils.db_session import provide_db_session
 
 
 class Item(Base):
@@ -27,7 +28,8 @@ class Item(Base):
         self. updated_at = updated_at
 
     @staticmethod
-    def add_item(name, db, updated_at=datetime.now(), size=0, is_dir=False):
+    @provide_db_session
+    def add_item(name, db=None, updated_at=datetime.now(), size=0, is_dir=False):
         print("Adding to item table name={} updated_at={} size={} is_dir={}".format(
             name, updated_at, size, is_dir))
         new_item = Item(name, updated_at, size, is_dir)
@@ -37,13 +39,15 @@ class Item(Base):
 
         return new_item.id
 
-    def update_item_size(self, size, db):
+    @provide_db_session
+    def update_item_size(self, size, db=None):
         self.size = size
 
         db.session.add(self)
 
     @staticmethod
-    def delete_item(id, db):
+    @provide_db_session
+    def delete_item(id, db=None):
         print("Deleting from item table id={}".format(id))
         item = with_row_locks(db.session.query(Item), of=Item).filter(
             Item.id == id).first()

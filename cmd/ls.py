@@ -1,51 +1,38 @@
+import re
+import argparse
 from collections import namedtuple
 from cmd.db_helpers import list_child_items
 from flask import session
 from const import PARENT_ID
 from utils.response import InvalidCmdError
-import re
-from cmd import LS_CMD, validate_args_len
+from utils.db_session import provide_db_session
 
-LS_RE = r'^ls( -l)*( \d+)*$'  # LS -l [LEVEL]
+# LS [-l] [LEVEL]
 LsArgs = namedtuple("LsArgs", ["is_verbose", "level"])
 
-LS_USAGE_DOC = '''
-usage: ls [-l] [LEVEL]
-       ls --help
-'''
 
+@provide_db_session
+def check_ls_cmd_args(cmd_args, db=None):
+    ls_parser = argparse.ArgumentParser(
+        description="list current working directory contents")
 
-def validate_level(level_str):
-    is_no = re.fullmatch(r'\d+', level_str)
-    if not is_no:
-        raise InvalidCmdError(
-            message=f'cr: Expected LEVEL to be a number: {level_str}')
-    level = int(level_str)
+    ls_parser.add_argument('-l', action='store_true')
+    ls_parser.add_argument(
+        'level', type=int, metavar='LEVEL', nargs='?', default=None)
 
-    return level
+    try:
+        parsed_args = ls_parser.parse_args(cmd_args)
 
+        level = int(parsed_args.level)
+        is_verbose = True if parsed_args.l else False
 
-def check_ls_cmd_args(cmd_args, db):
-    level = 0
-    is_verbose = False
-    validate_args_len(min_len=0, max_len=2)
-    if len(cmd_args) == 0:
         return LsArgs(is_verbose, level)
-    elif len(cmd_args) == 1:
-        if cmd_args[0] == '-l':
-            is_verbose = True
-        else:
-            level = validate_level(cmd_args[0])
-    else:  # 2 args
-        if cmd_args[0] == '-l':
-            is_verbose = True
-        else:
-            raise InvalidCmdError(
-                message=f'cr: Invalid option, expecting [-l]: {cmd_args[0]}')
+    except SystemExit as e:
+        # (str(e) == "0") -> --help/-h
+        err_msg = ls_parser.format_help() \
+            if str(e) == "0" else ls_parser.format_usage()
 
-        level = validate_level(cmd_args[1])
-
-    return LsArgs(is_verbose, level)
+        raise InvalidCmdError(message=err_msg)
 
 
 def dir_tree_structure(dir_contents, is_verbose=False):
@@ -67,7 +54,6 @@ def dir_tree_structure(dir_contents, is_verbose=False):
     lines.append(header)
 
     # add a row for each item in the folder
-
     for i, (ancestor, item) in enumerate(dir_contents):
         print("ancestor:parent_id={},child_id={},depth={},rank={};id:name={}".format(
             ancestor.parent_id, ancestor.child_id, ancestor.depth, ancestor.rank, item.name))
@@ -92,15 +78,16 @@ def dir_tree_structure(dir_contents, is_verbose=False):
                                        item.name,
                                        "/" if is_directory else ""))
 
-    return lines
+    return "\n".join(lines)
 
 
-def execute_ls_cmd(ls_args, db):
+@provide_db_session
+def execute_ls_cmd(ls_args, db=None):
     # in  hierarchical order
     print("execute_ls_cmd")
     print("PARENT_ID =", session.get(PARENT_ID, None))
     folder_contents = list_child_items(
-        parent_id=session.get(PARENT_ID, 0), depth=ls_args.level, db=db)
+        parent_id=session.get(PARENT_ID, 0), depth=ls_args.level)
 
     resp = {
         "response": dir_tree_structure(folder_contents, ls_args.is_verbose)

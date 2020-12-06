@@ -1,51 +1,56 @@
 from utils.paths import to_abs_path
-import re
 from cmd.db_helpers import item_exists
 from collections import namedtuple
 
 from flask import session
+from utils.db_session import provide_db_session
 from utils.response import terminal_prefix, InvalidCmdError
 from const import PARENT_ID, PARENT_ABS_PATH
-from cmd import CD_CMD, validate_args_len
+import argparse
 
-CD_RE = r'^cd ([./a-zA-Z0-9 _-]+)$'  # CD [FOLDER]
 CdArgs = namedtuple("CdArgs", ['path', 'folder_id'])
 
-CD_USAGE_DOC = '''
-usage: ls [-l] FOLDER
-       ls --help
-'''
 
-
-def check_cd_cmd_args(cmd_args, db):
+@provide_db_session
+def check_cd_cmd_args(cmd_args, db=None):
     # called when CMD_ARGS_CHECKER["cd"]() invoked
-    validate_args_len(CD_CMD, cmd_args, exact=1)
+    cd_parser = argparse.ArgumentParser(
+        description='change the current working directory')
 
-    _folder = cmd_args[0]
+    cd_parser.add_argument('folder', metavar='FOLDER',
+                           nargs='?', default=session.get(PARENT_ABS_PATH, "/"))
 
-    if _folder == "--help":
-        raise InvalidCmdError(
-            message=f'User requested usage docs of `cmd`',
-            ui_msg=CD_USAGE_DOC)
+    try:
+        parsed_args = cd_parser.parse_args(cmd_args)
 
-    if _folder.contains("*"):
-        raise InvalidCmdError(
-            message=f'cd: FOLDER cannot contain *: {_folder}'
-        )
+        _folder = parsed_args.folder
 
-    abs_path = to_abs_path(_folder)
+        if "*" in _folder:
+            raise InvalidCmdError(
+                message=f'cd: FOLDER cannot contain *: {_folder}'
+            )
 
-    folder_exists, folder_id = item_exists(
-        abs_path=abs_path, check_is_dir=True, db=db)
+        abs_path = to_abs_path(_folder)
 
-    if not folder_exists:
-        raise InvalidCmdError(
-            message=f'cd: no such directory: {_folder}')
+        folder_exists, folder_id = item_exists(
+            abs_path=abs_path, check_is_dir=True)
 
-    return CdArgs(abs_path, folder_id)
+        if not folder_exists:
+            raise InvalidCmdError(
+                message=f'cd: no such directory: {_folder}')
+
+        return CdArgs(abs_path, folder_id)
+
+    except SystemExit as e:
+        # (str(e) == "0") -> --help/-h
+        err_msg = cd_parser.format_help() \
+            if str(e) == "0" else cd_parser.format_usage()
+
+        raise InvalidCmdError(message=err_msg)
 
 
-def execute_cd_cmd(cd_args, db):
+@provide_db_session
+def execute_cd_cmd(cd_args, db=None):
     print(f'Executing cd cmd')
     session[PARENT_ABS_PATH] = cd_args.path
     session[PARENT_ID] = cd_args.folder_id
