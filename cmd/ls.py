@@ -59,11 +59,7 @@ def dir_tree_structure(dir_contents, is_verbose=False):
             ancestor.parent_id, ancestor.child_id, ancestor.depth, ancestor.rank, item.name))
         level = ancestor.rank.count(',')
 
-        is_directory = item.is_dir
-        if is_directory:  # a directory
-            indent = ' ' * 4 * (level)
-        else:
-            indent = ' ' * 4 * (level + 1)
+        indent = ' ' * 4 * (level)
 
         # print(f'level={level},indent={indent},item={item.name}')
 
@@ -76,7 +72,7 @@ def dir_tree_structure(dir_contents, is_verbose=False):
 
         lines.append('{}{}{}{}'.format(details, indent,
                                        item.name,
-                                       "/" if is_directory else ""))
+                                       "/" if item.is_dir else ""))
 
     return lines
 
