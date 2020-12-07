@@ -84,10 +84,13 @@ def execute_mv_cmd(mv_args, db=None):
                 move_item(
                     id=mv_args.srcs_id[0], new_parent_id=parent_dest_item_id)
         else:
-            # TODO: still uncertain about whether I understood this requirement correctly
-            # move the src to the parent_destination folder
-            move_item(id=mv_args.srcs_id[0],
-                      new_parent_id=parent_dest_item_id)
+            raise InvalidCmdError(
+                "cmd `mv source destination` where destination doesn't exist hasn't been implemented yet.SRRY!...")
+            # TODO
+            # may require renaming file, which would entail deleting src file and adding new one
+            # move_item(
+            #     id=mv_args.srcs_id[0], new_parent_id=parent_dest_item_id)
+
     else:  # many sources
 
         dest_exists, dest_item_id = item_exists(

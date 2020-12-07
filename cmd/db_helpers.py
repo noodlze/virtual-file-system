@@ -13,6 +13,8 @@ from models import with_row_locks
 from utils.db_session import provide_db_session
 from utils.response import InvalidCmdError
 
+# TODO: needs refractoring
+
 
 def splitall(path):
     allparts = []
@@ -241,8 +243,9 @@ def to_abs_path_ids(abs_path, db=None):
     item_ids = [0] * len(item_names)
     item_ids[0] = BASE_DIR_ID  # id of root('/') = 0
 
-    for i, item_name in enumerate(item_names[1:]):
-        parent_id = item_names[i-1]
+    for i in range(1, len(item_names)):
+        item_name = item_names[i]
+        parent_id = item_ids[i-1]
 
         # get parent folder contents
         child_item_ids = db.session.query(Ancestors.child_id).filter(
@@ -253,7 +256,7 @@ def to_abs_path_ids(abs_path, db=None):
         item = with_row_locks(db.session.query(Item).filter(and_(Item.id.in_(child_item_ids),
                                                                  Item.name == item_name)), of=Item).first()
         # convention used when item doesn't exist in parent
-        item_ids = item.id if item else -1
+        item_ids[i] = item.id if item else -1
 
     return (item_names, item_ids)
 
@@ -276,7 +279,8 @@ def item_name_exists_in_folder(item_id, parent_id, db=None):
 
     exists_item = with_row_locks(db.session.query(Ancestors, Item).join(
         Item, Item.id == Ancestors.child_id, isouter=True).filter(and_(Ancestors.parent_id == parent_id),
-                                                                  Item.name == new_item_name)).first()
+                                                                  Item.name == new_item_name,
+                                                                  Ancestors.depth == 1)).first()
     return True if exists_item else False
 
 
@@ -382,59 +386,3 @@ def resolve_asterisk_in_abs_path(abs_path, db=None):
 
     res = _resolve_path(item_names, item_ids, 1)
     return res
-    # # process second to second last arr elements
-    # for i in range(1, len(item_names)-1):
-    #     parent_id = item_ids[i-1]
-    #     item_name = item_names[i]
-    #     if item_name == "*":
-    #         # will give at most 1 match if intermediate dirs since unique names in same directory
-    #         # using  parent_id  and child_item_name of item to find a match
-    #         # depth between parent_id and child_item of item == 2:
-    #         # parent -> child (no constraint on item_name)
-    #         # child -> child items (item_name constraint = item_names[i+1])
-    #         child_ids = with_row_locks(db.session.query(Ancestors.child_id).filter(and_(Ancestors.parent_id == parent_id,
-    #                                                                                     Ancestors.depth == 2)
-    #                                                                                ), of=Ancestors).all()
-
-    #         ancestors_and_item = with_row_locks(db.session.query(Ancestors, Item).join(Item, Item.id == Ancestors.child_id).filter(and_(Ancestors.depth == 1,
-    #                                                                                                                                     Ancestors.child_id.in_(
-    #                                                                                                                                         child_ids),
-    #                                                                                                                                     Item.name == item_names[i+1]))).all()
-    #         if ancestors_and_item:
-    #             item_names[i] = ancestors_and_item[1].name
-    #             item_ids[i] = ancestors_and_item[1].id
-    #         else:
-    #             raise InvalidCmdError(
-    #                 f'unable to resolve asterisks(*) to a valid path : {abs_path}')
-    #     else:
-    #         item = get_item(item_name=item_name, parent_id=parent_id)
-
-    #         # convention used when item doesn't exist in parent
-    #         item_ids[i] = item.id if item else -1
-
-    # # process last part of the path
-
-    # res = []
-
-    # # may yield mutiple items if last item in path = '*'
-    # # get child items of depth = 1
-    # if item_names[-1] == '*':
-    #     query = db.session.query(Ancestors, Item).filter(
-    #         Ancestors.parent_id == item_ids[-2], Ancestors.depth == 1)
-    #     child_items = query.join(
-    #         Item, Item.id == Ancestors.child_id).all()
-
-    #     for _, item in child_items:
-    #         _item_names = item_names[:-1] + [item.name]
-    #         _item_ids = item_ids[:-1] + [item.id]
-
-    #         res.append((_item_names, _item_ids))
-    # else:
-    #     item = get_item(item_name=item_names[-1], parent_id=item_ids[-2])
-
-    #     #  convention used when item doesn't exist in parent
-    #     item_ids[i] = item.id if item else -1
-
-    #     res.append((item_names, item_ids))
-
-    # return res

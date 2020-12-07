@@ -53,3 +53,12 @@ class Item(Base):
             Item.id == id), of=Item).first()
 
         db.session.delete(item)
+
+    @staticmethod
+    @provide_db_session
+    def is_a_dir(id, db=None):
+        item = with_row_locks(db.session.query(
+            Item.is_dir).filter(Item.id == id)).first()
+        if item:
+            return True if item[0] else False
+        return False
