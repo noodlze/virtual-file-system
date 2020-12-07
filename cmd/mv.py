@@ -2,7 +2,7 @@ import re
 import os
 import argparse
 from utils.paths import to_abs_path
-from cmd.db_helpers import delete_item, item_exists, move_item, with_row_locks
+from cmd.db_helpers import delete_item, item_exists, move_item, with_row_locks, to_abs_path_ids, item_exists_in_folder, resolve_asterisk_in_abs_path
 from models.item import Item
 from collections import namedtuple
 from utils.response import InvalidCmdError
@@ -33,42 +33,45 @@ def check_mv_cmd_args(cmd_args, db=None):
     srcs = cmd_args[:-1]
     # srcs may contain asterisks
     abs_srcs = [to_abs_path(path) for path in srcs]
-    srcs_ids = []
 
-    for s in abs_srcs:
-        exists, item_id = item_exists(abs_path=s)
+    # deal with asterisks/wildcards
+    abs_srcs_no_wildcards = []
+    for abs_src_path in abs_srcs:
+        # a list of tuples
+        _abs_path_parts_list = resolve_asterisk_in_abs_path(abs_src_path)
+        abs_srcs_no_wildcards.extend(_abs_path_parts_list)
 
-        if not exists:
-            raise ValueError(f'mv: no such file or directory: {s}')
+    for name_parts, id_parts in abs_srcs_no_wildcards:
+        if -1 in id_parts:
+            raise ValueError(
+                f'mv: no such file(s) or directory(ies): {"/".join(name_parts)}')
 
-        srcs_ids.append(item_id)
+    abs_srcs_paths = ["/".join(_src[0]) for _src in abs_srcs_no_wildcards]
+    abs_srcs_path_ids = [_src[1][-1] for _src in abs_srcs_no_wildcards]
 
     dest = cmd_args[-1]
     abs_dest = to_abs_path(dest)
 
-    return MvArgs(abs_srcs, srcs_ids, abs_dest)
+    return MvArgs(srcs=abs_srcs_paths, srcs_id=abs_srcs_path_ids, dest=abs_dest)
 
 
 @provide_db_session
 def execute_mv_cmd(mv_args, db=None):
-    print("executing mv_cmd: srcs={},srcs_id={},dest={}".format(
-        mv_args.srcs, mv_args.srcs_id, mv_args.dest))
-    # TODO: deal with wildcards
     if len(mv_args.srcs) == 1:
         print("only 1 src")
-        # check if parent folder exists
-        parent_dest_exists, parent_dest_item_id = item_exists(
-            abs_path=os.path.dirname(mv_args.dest))
 
-        if not parent_dest_exists:
+        dest_path_parts, dest_path_parts_id = to_abs_path_ids(mv_args.dest)
+
+        # check if parent folder exists
+        if -1 in dest_path_parts_id[:-1]:
             raise ValueError(f'mv: no such file or directory: {mv_args.dest}')
 
-        # check if destination item exists
-        dest_exists, dest_item_id = item_exists(
-            abs_path=mv_args.dest)
-        if dest_exists:
+        parent_dest_item_id = dest_path_parts_id[-2]
+        dest_item_id = dest_path_parts_id[-1]
+
+        if dest_item_id != -1:  # dest item exists
             dest_item_is_dir = with_row_locks(db.session.query(
-                Item.is_dir)).filter(Item.id == dest_item_id).first()
+                Item.is_dir).filter(Item.id == dest_item_id), of=Item).first()
             if dest_item_is_dir:
                 # a directory
                 # move src item to new_parent_id
@@ -86,6 +89,7 @@ def execute_mv_cmd(mv_args, db=None):
             move_item(id=mv_args.srcs_id[0],
                       new_parent_id=parent_dest_item_id)
     else:  # many sources
+
         dest_exists, dest_item_id = item_exists(
             abs_path=mv_args.dest)
 
@@ -93,7 +97,7 @@ def execute_mv_cmd(mv_args, db=None):
             raise ValueError(
                 f'mv: no such destination file or directory: {mv_args.dest}')
         dest_item_is_dir = with_row_locks(db.session.query(
-            Item.is_dir)).filter(Item.id == dest_item_id).first()
+            Item.is_dir).filter(Item.id == dest_item_id), of=Item).first()
 
         if not dest_item_is_dir:
             raise ValueError(
@@ -101,3 +105,8 @@ def execute_mv_cmd(mv_args, db=None):
 
         for src_id in mv_args.srcs_id:
             move_item(id=src_id, new_parent_id=dest_item_id)
+
+    resp = {
+        "response": 'Moved:\n{}\n\t---->{}'.format("\n".join(mv_args.srcs), mv_args.dest)
+    }
+    return resp
