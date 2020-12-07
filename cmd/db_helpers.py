@@ -11,6 +11,7 @@ from sqlalchemy import (
 )
 from models import with_row_locks
 from utils.db_session import provide_db_session
+from utils.response import InvalidCmdError
 
 
 def splitall(path):
@@ -56,7 +57,7 @@ def item_exists(abs_path, db=None, check_is_dir=False):
 
     # allparts[0] == ""
     root_item = with_row_locks(db.session.query(
-        Item), of=Item).filter(Item.id == BASE_DIR_ID).first()
+        Item).filter(Item.id == BASE_DIR_ID), of=Item).first()
 
     parent_item = root_item
     # if abs_path contains many subdirectories
@@ -66,8 +67,8 @@ def item_exists(abs_path, db=None, check_is_dir=False):
             Ancestors.parent_id == parent_item.id).distinct().all()
 
         # check if item exists in parent folder
-        child_item = with_row_locks(db.session.query(Item), of=Item).filter(and_(Item.id.in_(child_item_ids),
-                                                                                 Item.name == item_name)).first()
+        child_item = with_row_locks(db.session.query(Item).filter(and_(Item.id.in_(child_item_ids),
+                                                                       Item.name == item_name)), of=Item).first()
         if not child_item:
             # item does not exist in parent
             return False, BASE_DIR_ID
@@ -94,18 +95,6 @@ def list_child_items(parent_id, db=None, depth=1):
         File, File.id == Ancestors.child_id, isouter=True).all()
     return query
 
-    # with_size = []
-    # for r in query.all():
-
-    #     if not r.data:  # a folder
-    #         # calculate folder size
-    #         f_size = with_row_locks(db.session.query(func.count(Ancestors.parent_id)), of=Ancestors).filter(
-    #             Ancestors.parent_id == r.child_id).scalar()
-    #         with_size.append(r, f_size)
-    #     else:
-    #         with_size.append(r, len(r.data))
-    # return with_size
-
 
 @provide_db_session
 def get_child_item(parent_id, child_name, db=None):
@@ -118,8 +107,8 @@ def get_child_item(parent_id, child_name, db=None):
     :type child_name: [type]
 
     """
-    r = with_row_locks(db.session.query(Ancestors).join(Item, Item.id == Ancestors.child_id)).filter(and_(Ancestors.parent_id == parent_id),
-                                                                                                     Item.name == child_name).first()
+    r = with_row_locks(db.session.query(Ancestors).join(Item, Item.id == Ancestors.child_id).filter(and_(Ancestors.parent_id == parent_id),
+                                                                                                    Item.name == child_name)).first()
     return r.id if r else None
 
 
@@ -162,6 +151,12 @@ def add_new_item(name, item_parent_id, db=None, data=None):
 
 
 @provide_db_session
+def delete_item_in_folder(id, parent_id, db=None):
+    # TODO: this would probably be more efficient
+    pass
+
+
+@provide_db_session
 def delete_item(id, db=None):
     # delete from ancestors table
     # NOTE: must delete before item to avoid fk violation
@@ -170,35 +165,39 @@ def delete_item(id, db=None):
 
     # delete from file table
     # NOTE: must delete before item to avoid fk violation
-    with_row_locks(db.session.query(File), of=File).filter(
-        File.id.in_(child_item_ids+[id])).delete(synchronize_session=False)
+    with_row_locks(db.session.query(File).filter(
+        File.id.in_(child_item_ids+[id])), of=File).delete(synchronize_session=False)
 
     # delete from item table
-    with_row_locks(db.session.query(Item), of=Item).filter(
-        Item.id.in_(child_item_ids+[id])).delete(synchronize_session=False)
+    with_row_locks(db.session.query(Item).filter(
+        Item.id.in_(child_item_ids+[id])), of=Item).delete(synchronize_session=False)
 
 
 @provide_db_session
 def move_item(id, new_parent_id, db=None):
+    # before moving check if item name already exists in parent_folder
+    if item_name_exists_in_folder(id, new_parent_id):
+        raise InvalidCmdError(
+            message="mv: an item with the same name already exists in the dest")
     # old_parent
-    old_parent_id = with_row_locks(db.session.query(Ancestors.parent_id), of=Ancestors).filter(and_(Ancestors.child_id == id,
-                                                                                                    Ancestors.depth == 1)).first()
+    old_parent_id = with_row_locks(db.session.query(Ancestors.parent_id).filter(and_(Ancestors.child_id == id,
+                                                                                     Ancestors.depth == 1)), of=Ancestors).first()
 
     # define subtree as id + all childs of id
     childs = with_row_locks(db.session.query(
-        Ancestors), of=Ancestors).filter(Ancestors.parent_id == id).all()
+        Ancestors).filter(Ancestors.parent_id == id), of=Ancestors).all()
     subtree_ids = [item.child_id for item in childs]
     subtree = with_row_locks(db.session.query(
         Ancestors), of=Ancestors).filter(Ancestors.parent_id.in_(subtree_ids)).all()
 
     # delete relationships between upper tree of the tree + subtree
     with_row_locks(db.session.query(
-        Ancestors), of=Ancestors).filter(and_(Ancestors.child_id.in_(subtree_ids),
-                                              not_(Ancestors.parent_id.in_(subtree_ids)))).delete(synchronize_session=False)
+        Ancestors).filter(and_(Ancestors.child_id.in_(subtree_ids),
+                               not_(Ancestors.parent_id.in_(subtree_ids)))), of=Ancestors).delete(synchronize_session=False)
 
     # add relationships between (new parent + upper tree of new_parent) + subtree
-    new_parent_upper_tree = with_row_locks(db.session.query(Ancestors), of=Ancestors).filter(
-        Ancestors.child_id == new_parent_id).all()
+    new_parent_upper_tree = with_row_locks(db.session.query(Ancestors).filter(
+        Ancestors.child_id == new_parent_id), of=Ancestors).all()
     for new_upper_item in new_parent_upper_tree:
         upper_parent_id = new_upper_item.parent_id
 
@@ -218,9 +217,9 @@ def move_item(id, new_parent_id, db=None):
     # updating old_parent size + updated_at(if dir)
     # updating new_parent size + updated_at(if dir)
     new_parent = with_row_locks(db.session.query(
-        Item), of=Item).filter(Item.id == new_parent_id).first()
-    old_parent = with_row_locks(db.session.query(Item), of=Item).filter(
-        Item.id == old_parent_id).first()
+        Item).filter(Item.id == new_parent_id), of=Item).first()
+    old_parent = with_row_locks(db.session.query(Item).filter(
+        Item.id == old_parent_id), of=Item).first()
 
     if new_parent.is_dir:
         new_parent.updated_at = datetime.now()
@@ -229,6 +228,213 @@ def move_item(id, new_parent_id, db=None):
     if old_parent.is_dir:
         old_parent.updated_at = datetime.now()
         old_parent.size -= 1
+
     db.session.add(new_parent)
     db.session.add(old_parent)
 
+
+@provide_db_session
+def to_abs_path_ids(abs_path, db=None):
+    item_names = abs_path.split("/")
+    item_names[0] = "/"  # replace '' with '/' to enable querying of root
+
+    item_ids = [0] * len(item_names)
+    item_ids[0] = BASE_DIR_ID  # id of root('/') = 0
+
+    for i, item_name in enumerate(item_names[1:]):
+        parent_id = item_names[i-1]
+
+        # get parent folder contents
+        child_item_ids = db.session.query(Ancestors.child_id).filter(
+            Ancestors.parent_id == parent_id).distinct().all()
+
+        # check if any of the child items have the same name as item_name
+        # since item names in same directory are distinct -> should only return at most 1 item
+        item = with_row_locks(db.session.query(Item).filter(and_(Item.id.in_(child_item_ids),
+                                                                 Item.name == item_name)), of=Item).first()
+        # convention used when item doesn't exist in parent
+        item_ids = item.id if item else -1
+
+    return (item_names, item_ids)
+
+
+@provide_db_session
+def item_exists_in_folder(item_id, parent_id, db=None):
+    if item_id == BASE_DIR_ID:  # don't care about parent_id
+        return True
+
+    relationship = with_row_locks(db.session.query(Ancestors).filter(and_(Ancestors.child_id == item_id,
+                                                                          Ancestors.parent_id == parent_id,
+                                                                          Ancestors.depth == 1)), of=Ancestors).first()
+    return True if relationship else False
+
+
+@provide_db_session
+def item_name_exists_in_folder(item_id, parent_id, db=None):
+    new_item_name = with_row_locks(db.session.query(
+        Item.name).filter(Item.id == item_id), of=Item).first()[0]
+
+    exists_item = with_row_locks(db.session.query(Ancestors, Item).join(
+        Item, Item.id == Ancestors.child_id, isouter=True).filter(and_(Ancestors.parent_id == parent_id),
+                                                                  Item.name == new_item_name)).first()
+    return True if exists_item else False
+
+
+@provide_db_session
+def get_item(item_name, parent_id, db=None):
+    # # get parent folder contents
+    # child_item_ids = db.session.query(Ancestors.child_id).filter(
+    #     Ancestors.parent_id == parent_id).distinct().all()
+
+    # # check if any of the child items have the same name as item_name
+    # # since item names in same directory are distinct -> should only return at most 1 item
+    # item = with_row_locks(db.session.query(Item), of=Item).filter(and_(Item.id.in_(child_item_ids),
+    #                                                                    Item.name == item_name)).first()
+    query = db.session.query(Ancestors, Item).filter(
+        Ancestors.parent_id == parent_id)
+    item = with_row_locks(query.join(Item, Item.id == Ancestors.child_id, isouter=True).filter(
+        Item.name == item_name)).first()
+
+    return item[1] if len(item) else None
+
+
+@provide_db_session
+def _resolve_path(item_name_list, item_id_list, begin_indx=1, db=None):
+    _item_names = item_name_list[:]
+    _item_ids = item_id_list[:]
+
+    # process from begin_indx -> second last arr element
+    for i in range(begin_indx, len(_item_names) - 1):
+        parent_id = _item_ids[i-1]
+        item_name = _item_names[i]
+        if item_name == "*":
+            # will give at most 1 match if intermediate dirs since unique names in same directory
+            # using  parent_id  and child_item_name of item to find a match
+            # depth between parent_id and child_item of item == 2:
+            # parent -> child (no constraint on item_name)
+            # child -> child items (item_name constraint = item_names[i+1])
+            child_ids = with_row_locks(db.session.query(Ancestors.child_id).filter(and_(Ancestors.parent_id == parent_id,
+                                                                                        Ancestors.depth == 2)
+                                                                                   ), of=Ancestors).all()
+
+            ancestors_and_item = with_row_locks(db.session.query(Ancestors, Item).join(Item, Item.id == Ancestors.child_id).filter(and_(Ancestors.depth == 1,
+                                                                                                                                        Ancestors.child_id.in_(
+                                                                                                                                            child_ids),
+                                                                                                                                        Item.name == _item_names[i+1]))).all()
+            if len(ancestors_and_item):
+                res = []
+
+                for _ancestor, _item in ancestors_and_item:
+                    _new_item_names = _item_names[:]
+                    _found_item_name = with_row_locks(db.session.query(
+                        Item.name).filter(Item.id == _ancestor.parent_id), of=Item).first()
+                    _new_item_names[i] = _found_item_name[0]
+
+                    _new_item_ids = _item_ids[:]
+                    _new_item_ids[i] = _ancestor.parent_id
+                    res.extend(_resolve_path(
+                        _new_item_names, _new_item_ids, i+1))
+
+                return res
+            else:
+                raise InvalidCmdError(
+                    'unable to resolve asterisks(*) to a valid path : {}'.format("/".join(_item_names)))
+        else:
+            item = get_item(item_name=item_name, parent_id=parent_id)
+
+            # convention used when item doesn't exist in parent
+            _item_ids[i] = item.id if item else -1
+
+    # process last part of the path
+
+    res = []
+
+    # may yield mutiple items if last item in path = '*'
+    # get child items of depth = 1
+    if _item_names[-1] == '*':
+        query = db.session.query(Ancestors, Item).filter(
+            Ancestors.parent_id == _item_ids[-2], Ancestors.depth == 1)
+        child_items = query.join(
+            Item, Item.id == Ancestors.child_id).all()
+
+        for _, item in child_items:
+            _item_names = _item_names[:-1] + [item.name]
+            _item_ids = _item_ids[:-1] + [item.id]
+
+            res.append((_item_names, _item_ids))
+    else:
+        item = get_item(item_name=_item_names[-1], parent_id=_item_ids[-2])
+
+        #  convention used when item doesn't exist in parent
+        _item_ids[-1] = item.id if item else -1
+
+        res.append((_item_names, _item_ids))
+
+    return res
+
+
+def resolve_asterisk_in_abs_path(abs_path, db=None):
+    item_names = abs_path.split("/")
+    # NOTE: item_names[0] = ''
+
+    item_ids = [0] * len(item_names)
+    item_ids[0] = BASE_DIR_ID  # id of root('/') = 0
+
+    res = _resolve_path(item_names, item_ids, 1)
+    return res
+    # # process second to second last arr elements
+    # for i in range(1, len(item_names)-1):
+    #     parent_id = item_ids[i-1]
+    #     item_name = item_names[i]
+    #     if item_name == "*":
+    #         # will give at most 1 match if intermediate dirs since unique names in same directory
+    #         # using  parent_id  and child_item_name of item to find a match
+    #         # depth between parent_id and child_item of item == 2:
+    #         # parent -> child (no constraint on item_name)
+    #         # child -> child items (item_name constraint = item_names[i+1])
+    #         child_ids = with_row_locks(db.session.query(Ancestors.child_id).filter(and_(Ancestors.parent_id == parent_id,
+    #                                                                                     Ancestors.depth == 2)
+    #                                                                                ), of=Ancestors).all()
+
+    #         ancestors_and_item = with_row_locks(db.session.query(Ancestors, Item).join(Item, Item.id == Ancestors.child_id).filter(and_(Ancestors.depth == 1,
+    #                                                                                                                                     Ancestors.child_id.in_(
+    #                                                                                                                                         child_ids),
+    #                                                                                                                                     Item.name == item_names[i+1]))).all()
+    #         if ancestors_and_item:
+    #             item_names[i] = ancestors_and_item[1].name
+    #             item_ids[i] = ancestors_and_item[1].id
+    #         else:
+    #             raise InvalidCmdError(
+    #                 f'unable to resolve asterisks(*) to a valid path : {abs_path}')
+    #     else:
+    #         item = get_item(item_name=item_name, parent_id=parent_id)
+
+    #         # convention used when item doesn't exist in parent
+    #         item_ids[i] = item.id if item else -1
+
+    # # process last part of the path
+
+    # res = []
+
+    # # may yield mutiple items if last item in path = '*'
+    # # get child items of depth = 1
+    # if item_names[-1] == '*':
+    #     query = db.session.query(Ancestors, Item).filter(
+    #         Ancestors.parent_id == item_ids[-2], Ancestors.depth == 1)
+    #     child_items = query.join(
+    #         Item, Item.id == Ancestors.child_id).all()
+
+    #     for _, item in child_items:
+    #         _item_names = item_names[:-1] + [item.name]
+    #         _item_ids = item_ids[:-1] + [item.id]
+
+    #         res.append((_item_names, _item_ids))
+    # else:
+    #     item = get_item(item_name=item_names[-1], parent_id=item_ids[-2])
+
+    #     #  convention used when item doesn't exist in parent
+    #     item_ids[i] = item.id if item else -1
+
+    #     res.append((item_names, item_ids))
+
+    # return res
