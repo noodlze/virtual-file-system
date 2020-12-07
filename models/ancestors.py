@@ -51,8 +51,8 @@ class Ancestors(Base):
                 literal(child_id, INTEGER),
                 Ancestors.depth + 1,
                 cast(concat(Ancestors.rank, ",",
-                            literal(f'{child_id}', STRINGTYPE)), TEXT)),
-                of=Ancestors).filter(Ancestors.child_id == parent_id).all()
+                            literal(f'{child_id}', STRINGTYPE)), TEXT)).filter(Ancestors.child_id == parent_id),
+                of=Ancestors).all()
 
             new_ancestors = [Ancestors(p, c, d, r)
                              for p, c, d, r in select_parent_rows]
@@ -72,12 +72,12 @@ class Ancestors(Base):
         deletes SUB TREE(default=True, optional): relations between item and contents (if directory)
         """
         # UPDATE parent item
-        parent_id = with_row_locks(db.session.query(Ancestors.parent_id), of=Ancestors).filter(
-            and_(Ancestors.child_id == id, Ancestors.depth == 1)).first()
+        parent_id = with_row_locks(db.session.query(Ancestors.parent_id).filter(
+            and_(Ancestors.child_id == id, Ancestors.depth == 1)), of=Ancestors).first()
 
         print("parent_id of Item={}".format(parent_id))
         parent_item = with_row_locks(db.session.query(
-            Item), of=Item).filter(Item.id == parent_id).first()
+            Item).filter(Item.id == parent_id), of=Item).first()
         parent_item.update_item_size(
             size=parent_item.size - 1)  # update parent dir size
 
@@ -91,19 +91,19 @@ class Ancestors(Base):
         if upper_tree:
             print("Deleting upper tree of item={}".format(id))
             select_parent_rows = with_row_locks(db.session.query(
-                Ancestors), of=Ancestors).filter(Ancestors.child_id == id).delete(synchronize_session=False)
+                Ancestors).filter(Ancestors.child_id == id), of=Ancestors).delete(synchronize_session=False)
 
         # must get children items
         # deleting SUB TREE
 
         select_child_ids = with_row_locks(
-            db.session.query(Ancestors.child_id), of=Ancestors).filter(Ancestors.parent_id == id).all()
+            db.session.query(Ancestors.child_id).filter(Ancestors.parent_id == id), of=Ancestors).all()
 
         if subtree:
             print("Deleting upper tree of item={}, contains items={}".format(
                 id, select_child_ids))
             select_subtree_rows = with_row_locks(db.session.query(
-                Ancestors), of=Ancestors).filter(Ancestors.child_id.in_(select_child_ids)).delete(synchronize_session=False)
+                Ancestors).filter(Ancestors.child_id.in_(select_child_ids)), of=Ancestors).delete(synchronize_session=False)
 
         # return the subtree item ids (may be needed by caller)
         return select_child_ids

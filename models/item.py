@@ -49,7 +49,7 @@ class Item(Base):
     @provide_db_session
     def delete_item(id, db=None):
         print("Deleting from item table id={}".format(id))
-        item = with_row_locks(db.session.query(Item), of=Item).filter(
-            Item.id == id).first()
+        item = with_row_locks(db.session.query(Item).filter(
+            Item.id == id), of=Item).first()
 
         db.session.delete(item)

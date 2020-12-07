@@ -31,5 +31,5 @@ class File(Base):
     def delete_item(id, db=None):
         print("Deleting from file table id={}".format(id))
 
-        with_row_locks(db.session.query(File), of=File).filter(
-            File.id == id).delete()
+        with_row_locks(db.session.query(File).filter(
+            File.id == id), of=File).delete()
