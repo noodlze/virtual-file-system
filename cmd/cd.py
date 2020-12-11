@@ -44,7 +44,7 @@ def check_cd_cmd_args(cmd_args, db=None):
     except SystemExit as e:
         # (str(e) == "0") -> --help/-h
         err_msg = cd_parser.format_help() \
-            if str(e) == "0" else cr_parser.format_usage()
+            if str(e) == "0" else cd_parser.format_usage()
 
         raise InvalidCmdError(message=err_msg)
 
