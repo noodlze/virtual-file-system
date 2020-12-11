@@ -181,6 +181,10 @@ def move_item(id, new_parent_id, db=None):
     if item_name_exists_in_folder(id, new_parent_id):
         raise InvalidCmdError(
             message="mv: an item with the same name already exists in the dest")
+    # cannot move if dest = file and source = folder
+    if Item.is_a_dir(id) and not Item.is_a_dir(new_parent_id):
+        raise InvalidCmdError(
+            message="mv: dest is a file but src is folder")
     # old_parent
     old_parent_id = with_row_locks(db.session.query(Ancestors.parent_id).filter(and_(Ancestors.child_id == id,
                                                                                      Ancestors.depth == 1)), of=Ancestors).first()
@@ -299,7 +303,7 @@ def get_item(item_name, parent_id, db=None):
     item = with_row_locks(query.join(Item, Item.id == Ancestors.child_id, isouter=True).filter(
         Item.name == item_name)).first()
 
-    return item[1] if len(item) else None
+    return item[1] if item else None
 
 
 @provide_db_session

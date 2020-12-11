@@ -60,5 +60,5 @@ class Item(Base):
         item = with_row_locks(db.session.query(
             Item.is_dir).filter(Item.id == id)).first()
         if item:
-            return True if item[0] else False
+            return True if item else False
         return False
