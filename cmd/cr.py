@@ -5,7 +5,7 @@ import argparse
 from utils.response import InvalidCmdError
 from utils.paths import to_abs_path
 from utils.db_session import provide_db_session
-from cmd.db_helpers import item_exists, splitall, add_new_item
+from cmd.db_helpers import item_exists, splitall, add_new_item, to_abs_path_ids
 from collections import namedtuple
 import sys
 
@@ -48,6 +48,7 @@ def check_cr_cmd_args(cmd_args, db=None):
         data = parsed_args.data
 
         # check if abs_path exists
+        # dest_path_parts, dest_path_parts_id = to_abs_path_ids(abs_path=abs_path)
         i_exists, _ = item_exists(abs_path=abs_path)
         print(f'does item {abs_path} exist={i_exists}')
         if i_exists:
@@ -93,7 +94,7 @@ def execute_cr_cmd(cr_args, db=None):
             print("Checking item {}".format(p))
             _path_itr += p
             exists, item_id = item_exists(
-                abs_path=_path_itr, check_is_dir=True)  # they must be directories and not files
+                abs_path=_path_itr)
             if exists:  # already exists
                 parent_id = item_id
             else:  # add new item
