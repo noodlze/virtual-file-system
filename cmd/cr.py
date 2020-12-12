@@ -92,7 +92,8 @@ def execute_cr_cmd(cr_args, db=None):
         for p in all_parts[:-1]:  # create everything in parent directories
             print("Checking item {}".format(p))
             _path_itr += p
-            exists, item_id = item_exists(abs_path=_path_itr)
+            exists, item_id = item_exists(
+                abs_path=_path_itr, check_is_dir=True)  # they must be directories and not files
             if exists:  # already exists
                 parent_id = item_id
             else:  # add new item
